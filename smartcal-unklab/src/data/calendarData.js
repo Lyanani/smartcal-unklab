@@ -1,0 +1,216 @@
+/* ---------- Konfigurasi EmailJS ---------- */
+export const EMAILJS_CONFIG = {
+  SERVICE_ID: 'service_jo4id2t',
+  TEMPLATE_ID: 'template_operlmo',
+  PUBLIC_KEY: '674ejfky3n1alm5ce',
+}
+
+/* ---------- Data Master ---------- */
+export const CATEGORIES = {
+  akademik: {
+    label: 'Akademik & KRS',
+    dot: 'bg-sky-500',
+    bar: 'bg-sky-500',
+    badge: 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/60 dark:bg-sky-950/60 dark:text-sky-300',
+  },
+  ujian: {
+    label: 'Ujian UTS/UAS',
+    dot: 'bg-rose-500',
+    bar: 'bg-rose-500',
+    badge: 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/60 dark:text-rose-300',
+  },
+  libur: {
+    label: 'Hari Libur',
+    dot: 'bg-emerald-500',
+    bar: 'bg-emerald-500',
+    badge: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/60 dark:text-emerald-300',
+  },
+  kegiatan: {
+    label: 'Kegiatan Kampus',
+    dot: 'bg-amber-500',
+    bar: 'bg-amber-500',
+    badge: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/60 dark:text-amber-300',
+  },
+  pribadi: {
+    label: 'Tugas Pribadi',
+    dot: 'bg-violet-500',
+    bar: 'bg-violet-500',
+    badge: 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900/60 dark:bg-violet-950/60 dark:text-violet-300',
+  },
+}
+
+export const CATEGORY_KEYS = Object.keys(CATEGORIES)
+export const CAMPUS_CATEGORY_KEYS = ['akademik', 'ujian', 'libur', 'kegiatan']
+
+export const FACULTIES = [
+  'Semua Fakultas',
+  'Fakultas Ilmu Komputer (FILKOM)',
+  'Fakultas Ekonomi',
+  'Fakultas Keperawatan',
+]
+
+export const DEFAULT_CHECKLIST = [
+  {
+    id: 'chk-1',
+    title: 'Selesaikan Pengisian EDOM 100% di SIAKAD',
+    deadline: 'Batas: 23 Nov 2026',
+    detail: 'Wajib sebelum pencetakan kartu UAS dan pembukaan akses Pra-KRS.',
+    done: false,
+  },
+  {
+    id: 'chk-2',
+    title: 'Verifikasi Status Bebas Tunggakan Keuangan',
+    deadline: 'Batas: 24 Nov 2026',
+    detail: 'Pastikan tagihan semester ganjil lunas agar validasi KRS tidak terkunci.',
+    done: false,
+  },
+  {
+    id: 'chk-3',
+    title: 'Susun Draf Rencana Mata Kuliah Semester Genap',
+    deadline: 'Batas: 25 Nov 2026',
+    detail: 'Cek mata kuliah prasyarat dan jumlah SKS maksimal berdasarkan IPS terakhir.',
+    done: false,
+  },
+  {
+    id: 'chk-4',
+    title: 'Konsultasi & Tanda Tangan Validasi Dosen PA',
+    deadline: '25 – 27 Nov 2026',
+    detail: 'Temui Dosen Pembimbing Akademik sesuai jadwal prodi masing-masing.',
+    done: false,
+  },
+  {
+    id: 'chk-5',
+    title: 'Kumpulkan Berkas / Laporan Praktikum Akhir',
+    deadline: 'Sebelum 30 Nov 2026',
+    detail: 'Pastikan seluruh nilai praktikum laboratorium sudah terinput sebelum Minggu Tenang.',
+    done: false,
+  },
+]
+
+export const INITIAL_EVENTS = [
+  {
+    id: 'init-1',
+    start: 2,
+    end: 6,
+    category: 'kegiatan',
+    faculty: 'Semua Fakultas',
+    title: 'Pekan Doa Mahasiswa Semester Ganjil',
+    time: '07.00 WITA',
+    location: 'Gedung Pniel UNKLAB',
+    description: 'Ibadah kebangunan rohani wajib bagi seluruh mahasiswa reguler dan asrama bersama pembicara tamu.',
+  },
+  {
+    id: 'init-2',
+    start: 3,
+    end: 3,
+    category: 'akademik',
+    faculty: 'Fakultas Ilmu Komputer (FILKOM)',
+    title: 'Batas Pengumpulan Proposal Skripsi & Proyek Sistem',
+    time: '16.00 WITA',
+    location: 'Portal SIAKAD / Lab FILKOM',
+    description: 'Batas akhir unggah dokumen proposal bab 1-3 beserta lembar persetujuan dosen pembimbing.',
+  },
+  {
+    id: 'init-3',
+    start: 6,
+    end: 6,
+    category: 'akademik',
+    faculty: 'Semua Fakultas',
+    title: 'Batas Input Nilai Mid-Semester oleh Dosen',
+    time: '23.59 WITA',
+    location: 'Portal Akademik SIAKAD',
+    description: 'Seluruh nilai ujian tengah semester dapat diakses mahasiswa melalui transkrip sementara.',
+  },
+  {
+    id: 'init-4',
+    start: 10,
+    end: 10,
+    category: 'ujian',
+    faculty: 'Fakultas Keperawatan',
+    title: 'Ujian Praktik Klinik & OSCE Keperawatan Dasar',
+    time: '08.00 WITA',
+    location: 'Laboratorium Mini Hospital',
+    description: 'Mahasiswa wajib mengenakan seragam praktik lengkap dan hadir 30 menit sebelum sesi dimulai.',
+  },
+  {
+    id: 'init-5',
+    start: 12,
+    end: 12,
+    category: 'kegiatan',
+    faculty: 'Fakultas Ilmu Komputer (FILKOM)',
+    title: 'Seminar Nasional AI & Rekayasa Perangkat Lunak',
+    time: '09.00 WITA',
+    location: 'Auditorium Utama UNKLAB',
+    description: 'Kuliah umum bersama praktisi industri teknologi mengenai tren pengembangan sistem cerdas.',
+  },
+  {
+    id: 'init-6',
+    start: 16,
+    end: 20,
+    category: 'ujian',
+    faculty: 'Semua Fakultas',
+    title: 'Ujian Praktikum Laboratorium Terpadu',
+    time: '08.00 WITA',
+    location: 'Gedung Laboratorium Terpadu',
+    description: 'Pelaksanaan evaluasi akhir mata kuliah praktikum sesuai jadwal kelompok masing-masing program studi.',
+  },
+  {
+    id: 'init-7',
+    start: 18,
+    end: 18,
+    category: 'kegiatan',
+    faculty: 'Fakultas Ekonomi',
+    title: 'Business Plan Expo & Pameran Kewirausahaan',
+    time: '10.00 WITA',
+    location: 'Student Center UNKLAB',
+    description: 'Presentasi produk inovasi mahasiswa Fakultas Ekonomi yang terbuka untuk seluruh civitas akademika.',
+  },
+  {
+    id: 'init-8',
+    start: 20,
+    end: 20,
+    category: 'libur',
+    faculty: 'Semua Fakultas',
+    title: 'Dies Natalis Universitas Klabat — Kuliah Ditiadakan',
+    time: 'Seharian',
+    location: 'Seluruh Lingkungan Kampus',
+    description: 'Hari libur akademik memperingati hari jadi Universitas Klabat. Kegiatan perkuliahan diliburkan.',
+  },
+  {
+    id: 'init-9',
+    start: 23,
+    end: 23,
+    category: 'akademik',
+    faculty: 'Semua Fakultas',
+    title: 'Batas Akhir Pengisian Evaluasi Kinerja Dosen (EDOM)',
+    time: '23.59 WITA',
+    location: 'Portal SIAKAD Online',
+    description: 'Syarat wajib sebelum pencetakan kartu ujian akhir semester (UAS) dan pengisian KRS berikutnya.',
+  },
+  {
+    id: 'init-10',
+    start: 25,
+    end: 27,
+    category: 'akademik',
+    faculty: 'Semua Fakultas',
+    title: 'Konsultasi & Pra-Pengisian KRS Semester Genap 2026/2027',
+    time: '08.00 WITA',
+    location: 'Ruang Dosen Pembimbing Akademik',
+    description: 'Mahasiswa wajib berkonsultasi dengan Dosen PA untuk validasi mata kuliah semester depan.',
+  },
+  {
+    id: 'init-11',
+    start: 30,
+    end: 30,
+    category: 'ujian',
+    faculty: 'Semua Fakultas',
+    title: 'Mulai Minggu Tenang Menjelang UAS Ganjil',
+    time: 'Seharian',
+    location: 'Perpustakaan & Kampus Airmadidi',
+    description: 'Tidak ada perkuliahan tatap muka; mahasiswa dipersilakan mempersiapkan diri untuk Ujian Akhir Semester.',
+  },
+]
+
+export const TODAY = 15
+export const DAY_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
+export const COUNTDOWN_TARGET = new Date('2026-11-25T08:00:00+08:00').getTime()
