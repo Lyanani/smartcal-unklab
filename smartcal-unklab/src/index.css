@@ -1,7 +1,0 @@
-@import "tailwindcss";
-@custom-variant dark (&:where(.dark, .dark *));
-
-@theme {
-  --color-canvas: #fafafa;
-  --color-line: #e4e4e7;
-}
