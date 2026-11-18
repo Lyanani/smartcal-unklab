@@ -57,6 +57,7 @@ export default function App() {
   // Tab Aktif Persisten di LocalStorage
   const [showLogin, setShowLogin] = useState(false)
   const [viewMode, setViewMode] = useState('faculty')
+  const [facultyScope, setFacultyScope] = useState('all')
   const [activeTab, setActiveTab] = useState(() => {
     try {
       const saved = localStorage.getItem('smartcal-active-tab')
@@ -418,9 +419,11 @@ export default function App() {
     }
     return allEvents.filter((e) => {
       if (e.isPersonal) return e.ownerEmail === user.email
+      if (facultyScope === 'faculty') return e.faculty === user.faculty
+      if (facultyScope === 'general') return e.faculty === 'Semua Fakultas'
       return e.faculty === 'Semua Fakultas' || e.faculty === user.faculty
     })
-  }, [allEvents, user])
+  }, [allEvents, user, facultyScope])
 
   const visibleEvents = useMemo(() => {
     const q = query.trim().toLowerCase()
