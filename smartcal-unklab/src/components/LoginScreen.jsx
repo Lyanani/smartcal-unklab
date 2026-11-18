@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { cn } from '../utils/calendarUtils'
 
-export default function LoginScreen({ onLogin, dark, onToggleTheme }) {
+export default function LoginScreen({ onLogin, onBack, dark, onToggleTheme }) {
   const [role, setRole] = useState('mahasiswa')
   const [email, setEmail] = useState('')
   const [faculty, setFaculty] = useState('Fakultas Ilmu Komputer (FILKOM)')
@@ -152,6 +152,16 @@ export default function LoginScreen({ onLogin, dark, onToggleTheme }) {
             <ArrowRight className="size-4" />
           </button>
         </form>
+
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="mt-4 w-full cursor-pointer text-center text-xs font-medium text-zinc-500 underline-offset-2 hover:text-zinc-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100"
+          >
+            ← Kembali ke Dashboard Tamu
+          </button>
+        )}
 
         <p className="mt-5 border-t border-line pt-4 text-center text-[11px] text-zinc-400 dark:border-slate-800 dark:text-slate-500">
           Semester Ganjil 2026/2027 · Universitas Klabat Airmadidi

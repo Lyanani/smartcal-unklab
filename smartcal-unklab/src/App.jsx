@@ -29,9 +29,12 @@ import Timeline from './components/Timeline'
 import WorkspaceTab from './components/WorkspaceTab'
 import EventDetailModal from './components/EventDetailModal'
 import AddEventModal from './components/AddEventModal'
+import GuestDashboard from './components/guest/GuestDashboard'
+import { GUEST_EVENTS } from './data/guestCalendar'
 
 export default function App() {
   const [user, setUser] = useState(null)
+  const [showLogin, setShowLogin] = useState(false)
   const [activeTab, setActiveTab] = useState('dashboard')
   const [dark, setDark] = useState(false)
   const [events, setEvents] = useState(INITIAL_EVENTS)
@@ -352,12 +355,26 @@ export default function App() {
   }
 
   if (!user) {
+    // Halaman awal = Dashboard Tamu (tanpa login). Login hanya dibuka lewat tombol "Masuk".
+    if (!showLogin) {
+      // TEMP-EDIT-CALENDAR: ganti seluruh blok <TempEditCalendar> ini dengan versi tanpa fitur sementara:
+      //   <GuestDashboard events={GUEST_EVENTS} onLogin={() => setShowLogin(true)} dark={dark} onToggleTheme={toggleTheme} />
+      return (
+      <GuestDashboard
+        events={GUEST_EVENTS}
+        onLogin={() => setShowLogin(true)}
+        dark={dark}
+        onToggleTheme={toggleTheme}
+      />
+    )
+    }
     return (
       <LoginScreen
         onLogin={(u) => {
           setUser(u)
           setActiveTab('dashboard')
         }}
+        onBack={() => setShowLogin(false)}
         dark={dark}
         onToggleTheme={toggleTheme}
       />
@@ -370,7 +387,10 @@ export default function App() {
     <div className="min-h-screen bg-canvas text-zinc-900 dark:bg-slate-950 dark:text-slate-100">
       <Navbar
         user={user}
-        onLogout={() => setUser(null)}
+        onLogout={() => {
+          setUser(null)
+          setShowLogin(false)
+        }}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         remindedCount={remindedIds.size}
