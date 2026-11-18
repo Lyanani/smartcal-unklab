@@ -10,7 +10,7 @@ const getParts = (diff) => [
   { label: 'Detik', value: Math.floor(diff / 1e3) % 60 },
 ]
 
-export default function HeroCountdown({ events = [], now = new Date() }) {
+export default function HeroCountdown({ user, events = [], now = new Date() }) {
   const [currentTime, setCurrentTime] = useState(() => Date.now())
   const [index, setIndex] = useState(0)
 
@@ -54,31 +54,15 @@ export default function HeroCountdown({ events = [], now = new Date() }) {
       className="rounded-xl border border-line bg-white shadow-2xs dark:border-slate-800 dark:bg-slate-900/70"
       aria-labelledby="hero-title"
     >
-      <div className="grid grid-cols-1 gap-0 lg:grid-cols-12">
-
-        {/* ── Left column: Event details (7/12) ───────────────────── */}
-        <div className="flex flex-col justify-center gap-3 p-5 sm:p-6 lg:col-span-7 lg:border-r lg:border-line lg:dark:border-slate-800">
-
-          {/* Status pill */}
-          <div>
-            {currentStatus?.isOngoing ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300">
-                <span className="relative flex size-1.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
-                </span>
-                {currentStatus.badgeText}
-              </span>
-            ) : currentStatus?.isUpcoming ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-700 dark:border-sky-900/80 dark:bg-sky-950/70 dark:text-sky-300">
-                <span className="size-1.5 rounded-full bg-sky-500" />
-                {currentStatus.badgeText}
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-0.5 text-xs font-medium text-zinc-500 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-400">
-                Semester Ganjil 2026/2027
-              </span>
-            )}
+      <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-slate-400">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/80 px-2.5 py-0.5 font-medium text-zinc-700 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200">
+              <span className="size-1.5 rounded-full bg-sky-500" /> Agenda Krusial Terdekat
+            </span>
+            <span>
+              {user?.role === 'admin' ? 'Mode admin' : `Filter Aktif: ${user?.faculty || 'Semua Fakultas'}`}
+            </span>
           </div>
 
           {/* Event title */}

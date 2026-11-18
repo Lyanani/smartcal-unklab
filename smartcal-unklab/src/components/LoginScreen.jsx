@@ -32,8 +32,8 @@ export default function LoginScreen({ onLogin, dark, onToggleTheme }) {
     onLogin({
       role,
       email: trimmed,
-      name: displayName || (role === 'admin' ? 'Admin BAA' : 'Mahasiswa UNKLAB'),
-      faculty: role === 'admin' ? 'Biro Administrasi Akademik' : faculty,
+      name: displayName || (role === 'admin' ? 'Admin' : 'Mahasiswa UNKLAB'),
+      faculty: role === 'admin' ? 'Admin' : faculty,
     })
   }
 
@@ -93,7 +93,7 @@ export default function LoginScreen({ onLogin, dark, onToggleTheme }) {
                 )}
               >
                 <ShieldCheck className="size-3.5" />
-                Admin Akademik
+                Admin
               </button>
             </div>
           </div>

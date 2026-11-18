@@ -141,7 +141,7 @@ export default function Navbar({
             <div className="hidden text-left sm:block">
               <p className="max-w-[120px] truncate text-xs font-medium leading-none">{user.name}</p>
               <p className="mt-0.5 max-w-[120px] truncate text-[10px] text-zinc-400 dark:text-slate-500">
-                {user.role === 'admin' ? 'Admin BAA' : user.faculty.replace('Fakultas ', '')}
+                {user.role === 'admin' ? 'Admin' : user.faculty.replace('Fakultas ', '')}
               </p>
             </div>
           </div>

@@ -1,3 +1,4 @@
+import AdminScheduleWorkspace from './AdminScheduleWorkspace'
 import { useMemo, useState } from 'react'
 import {
   Bell,
@@ -47,6 +48,18 @@ export default function WorkspaceTab({
   now = new Date(),
 }) {
   const isAdmin = user?.role === 'admin'
+  if (isAdmin) {
+    return (
+      <AdminScheduleWorkspace
+        events={events}
+        recentlyEditedId={null}
+        onSelectEvent={onSelectEvent}
+        onDeleteEvent={onDeleteEvent}
+        onOpenAddModal={onOpenAddModal}
+        onOpenEditModal={() => {}}
+      />
+    )
+  }
   const currentYear = viewYear ?? now.getFullYear()
   const currentMonth = viewMonth ?? now.getMonth()
 

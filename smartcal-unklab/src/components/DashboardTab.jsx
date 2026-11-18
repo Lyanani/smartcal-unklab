@@ -156,7 +156,7 @@ export default function DashboardTab({
       </div>
 
       {/* ── Hero Countdown Card ─────────────────────────────────────────── */}
-      <HeroCountdown events={events} now={now} />
+      <HeroCountdown user={user} events={events} now={now} />
 
       {/* 4 Kartu KPI */}
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Ringkasan statistik">
@@ -445,7 +445,7 @@ export default function DashboardTab({
           <section className="flex flex-col gap-5 rounded-xl border border-line bg-white p-5 dark:border-slate-800 dark:bg-slate-900/70">
             <div className="flex items-center justify-between border-b border-line pb-3.5 dark:border-slate-800">
               <div>
-                <h2 className="text-base font-semibold tracking-tight">Analitik Jadwal & Pengingat BAA</h2>
+                <h2 className="text-base font-semibold tracking-tight">Analitik Jadwal & Pengingat</h2>
                 <p className="text-xs text-zinc-500 dark:text-slate-400">
                   Proporsi kategori dan agenda paling banyak dipantau mahasiswa
                 </p>

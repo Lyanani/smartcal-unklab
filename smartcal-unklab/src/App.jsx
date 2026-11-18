@@ -1065,7 +1065,7 @@ export default function App() {
         )}
 
         <footer className="flex flex-col gap-1 border-t border-line pt-5 text-xs text-zinc-500 dark:border-slate-800 dark:text-slate-500 sm:flex-row sm:justify-between">
-          <span>Biro Administrasi Akademik — Universitas Klabat</span>
+          <span>SmartCal — Universitas Klabat</span>
           <span>Login aktif: {user.email}</span>
         </footer>
       </main>
