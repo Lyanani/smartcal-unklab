@@ -56,6 +56,7 @@ export default function App() {
 
   // Tab Aktif Persisten di LocalStorage
   const [showLogin, setShowLogin] = useState(false)
+  const [viewMode, setViewMode] = useState('faculty')
   const [activeTab, setActiveTab] = useState(() => {
     try {
       const saved = localStorage.getItem('smartcal-active-tab')
