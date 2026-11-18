@@ -1,32 +1,53 @@
-import { Fragment, useEffect, useRef } from 'react'
+import { Fragment } from 'react'
 import { ArrowRight, CalendarX, Clock, MapPin, Sparkles } from 'lucide-react'
-import { CATEGORIES, TODAY, TODAY_LABEL } from '../data/calendarData'
+import { CATEGORIES, MONTH_NAMES } from '../data/calendarData'
 import { cn, weekdayOf } from '../utils/calendarUtils'
 import QuickRemindButton from './QuickRemindButton'
 
-export default function Timeline({ events, flashDay, constrained, remindedIds, sendingEventId, onSendReminder, onSelectEvent }) {
-  const sorted = [...events].sort((a, b) => a.start - b.start)
+export default function Timeline({
+  events,
+  flashDay,
+  constrained,
+  remindedIds,
+  sendingEventId,
+  onSendReminder,
+  onSelectEvent,
+  now = new Date(),
+}) {
+  const sorted = [...events].sort((a, b) => {
+    const timeA = new Date(a.year ?? 2026, a.month ?? 10, a.start).getTime()
+    const timeB = new Date(b.year ?? 2026, b.month ?? 10, b.start).getTime()
+    return timeA - timeB
+  })
+
   const groups = new Map()
   for (const event of sorted) {
-    const list = groups.get(event.start) ?? []
-    list.push(event)
-    groups.set(event.start, list)
+    const year = event.year ?? 2026
+    const month = event.month ?? 10
+    const key = `${year}-${month}-${event.start}`
+    const existing = groups.get(key) ?? {
+      key,
+      year,
+      month,
+      day: event.start,
+      events: [],
+    }
+    existing.events.push(event)
+    groups.set(key, existing)
   }
-  const markerDay = [...groups.keys()].find((d) => d >= TODAY)
 
-  const olRef = useRef(null)
-  useEffect(() => {
-    if (!olRef.current || markerDay === undefined) return
-    const markerEl = document.getElementById(`tl-${markerDay}`)
-    if (!markerEl) return
-    olRef.current.scrollTop = Math.max(0, markerEl.offsetTop - olRef.current.offsetTop - 12)
-  }, [markerDay])
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const groupList = [...groups.values()]
+  const markerGroup = groupList.find((g) => {
+    const gTime = new Date(g.year, g.month, g.day).getTime()
+    return gTime >= todayStart
+  })
 
   return (
     <aside
       className={cn(
         'flex flex-col rounded-xl border border-line bg-white dark:border-slate-800 dark:bg-slate-900/60',
-        constrained && 'lg:max-h-[730px]',
+        constrained && 'lg:max-h-[780px]',
       )}
       aria-labelledby="timeline-title"
     >
@@ -40,43 +61,64 @@ export default function Timeline({ events, flashDay, constrained, remindedIds, s
         </span>
       </div>
 
-      <ol ref={olRef} className="flex-1 overflow-y-auto scroll-pt-2 px-4 py-3">
-        {groups.size === 0 ? (
+      <ol className="flex-1 overflow-y-auto px-4 py-3">
+        {groupList.length === 0 ? (
           <li className="flex flex-col items-center gap-2 py-12 text-center text-sm text-zinc-500 dark:text-slate-400">
             <CalendarX className="size-5" strokeWidth={1.75} />
             Tidak ada agenda yang cocok dengan filter.
           </li>
         ) : (
-          [...groups.entries()].map(([day, dayEvents]) => {
-            const past = day < TODAY && dayEvents.every((e) => e.end < TODAY)
-            const flashing = flashDay?.day === day
+          groupList.map((group) => {
+            const groupEndDay = Math.max(...group.events.map((e) => e.end))
+            const groupEndTime = new Date(
+              group.year,
+              group.month,
+              groupEndDay,
+              23,
+              59,
+              59,
+            ).getTime()
+            const past = groupEndTime < todayStart
+            const flashing = flashDay?.day === group.day
+
             return (
-              <Fragment key={day}>
-                {day === markerDay && (
+              <Fragment key={group.key}>
+                {markerGroup && group === markerGroup && (
                   <li className="flex items-center gap-2 py-2 text-[11px] font-medium uppercase tracking-wider text-rose-500">
                     <span className="size-1.5 rounded-full bg-rose-500" />
-                    Hari ini - {TODAY_LABEL}
+                    Hari ini · {weekdayOf(now.getDate(), now.getFullYear(), now.getMonth())},{' '}
+                    {now.getDate()} {MONTH_NAMES[now.getMonth()]?.slice(0, 3)}
                     <span className="h-px flex-1 bg-rose-500/30" />
                   </li>
                 )}
                 <li
-                  id={`tl-${day}`}
+                  id={`tl-${group.day}`}
                   key={flashing ? `f-${flashDay.key}` : undefined}
-                  className={cn('relative rounded-lg py-2 pl-5', past && 'opacity-55', flashing && 'animate-flash')}
+                  className={cn(
+                    'relative rounded-lg py-2 pl-5',
+                    past && 'opacity-55',
+                    flashing && 'animate-flash',
+                  )}
                 >
                   <span className="absolute bottom-0 left-[3px] top-0 w-px bg-line dark:bg-slate-800" />
                   <span className="absolute left-0 top-3.5 size-[7px] rounded-full border border-zinc-300 bg-white dark:border-slate-600 dark:bg-slate-900" />
                   <p className="mb-1.5 text-xs font-medium text-zinc-500 dark:text-slate-400">
-                    <span className="tabular-nums text-zinc-900 dark:text-slate-100">{day} Nov</span> · {weekdayOf(day)}
+                    <span className="tabular-nums text-zinc-900 dark:text-slate-100">
+                      {group.day} {MONTH_NAMES[group.month]?.slice(0, 3)}
+                    </span>{' '}
+                    · {weekdayOf(group.day, group.year, group.month)}
                   </p>
                   <div className="flex flex-col gap-2">
-                    {dayEvents.map((event) => {
+                    {group.events.map((event) => {
                       const isReminded = remindedIds.has(String(event.id))
                       const isSending = sendingEventId === String(event.id)
                       return (
                         <article
                           key={event.id}
                           onClick={() => onSelectEvent(event)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => e.key === 'Enter' && onSelectEvent(event)}
                           className={cn(
                             'cursor-pointer touch-manipulation rounded-lg border px-3 py-2.5 transition',
                             isReminded
@@ -86,27 +128,22 @@ export default function Timeline({ events, flashDay, constrained, remindedIds, s
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-start gap-2">
-                              <span className={cn('mt-1.5 size-2 shrink-0 rounded-full', CATEGORIES[event.category]?.dot || 'bg-sky-500')} />
+                              <span
+                                className={cn(
+                                  'mt-1.5 size-2 shrink-0 rounded-full',
+                                  CATEGORIES[event.category]?.dot || 'bg-sky-500',
+                                )}
+                              />
                               <div className="min-w-0">
-                                <h3 className="text-sm font-medium leading-snug">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      onSelectEvent(event)
-                                    }}
-                                    className="cursor-pointer text-left"
-                                  >
-                                    {event.title}
-                                  </button>
-                                </h3>
+                                <h3 className="text-sm font-medium leading-snug">{event.title}</h3>
                                 <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-zinc-500 dark:text-slate-400">
                                   <span className="inline-flex items-center gap-1">
                                     <Clock className="size-3" /> {event.time}
                                   </span>
                                   {event.end > event.start && (
                                     <span className="inline-flex items-center gap-1 tabular-nums">
-                                      <ArrowRight className="size-3" /> s.d. {event.end} Nov
+                                      <ArrowRight className="size-3" /> s.d. {event.end}{' '}
+                                      {MONTH_NAMES[event.month ?? 10]?.slice(0, 3)}
                                     </span>
                                   )}
                                   <span className="inline-flex items-center gap-1">
@@ -118,7 +155,9 @@ export default function Timeline({ events, flashDay, constrained, remindedIds, s
                           </div>
 
                           <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-line/70 pt-2 text-[11px] dark:border-slate-800/80">
-                            <span className="truncate text-zinc-400 dark:text-slate-500">{event.faculty}</span>
+                            <span className="truncate text-zinc-400 dark:text-slate-500">
+                              {event.faculty}
+                            </span>
                             <QuickRemindButton
                               event={event}
                               isSent={isReminded}
