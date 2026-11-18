@@ -1277,34 +1277,85 @@ function FilterBar({ events, active, onToggle, view, onViewChange, isAdmin, onOp
 }
 
 const WEEKDAYS = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
-const CELLS = (() => {
+const MONTH_NAMES = [
+  'Januari','Februari','Maret','April','Mei','Juni',
+  'Juli','Agustus','September','Oktober','November','Desember',
+]
+
+function buildCells(year, month) {
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const daysInPrevMonth = new Date(year, month, 0).getDate()
+  const startOffset = (new Date(year, month, 1).getDay() + 6) % 7
   const cells = []
-  for (let d = 26; d <= 31; d++) cells.push({ day: d, muted: true })
-  for (let d = 1; d <= 30; d++) cells.push({ day: d })
-  for (let d = 1; cells.length < 42; d++) cells.push({ day: d, muted: true })
+  for (let i = startOffset - 1; i >= 0; i--) {
+    cells.push({ day: daysInPrevMonth - i, muted: true })
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push({ day: d })
+  }
+  let nextDay = 1
+  while (cells.length < 42) {
+    cells.push({ day: nextDay++, muted: true })
+  }
   return cells
-})()
+}
+
+const REAL_TODAY = new Date()
+const REAL_TODAY_DAY = REAL_TODAY.getDate()
+const REAL_TODAY_MONTH = REAL_TODAY.getMonth()
+const REAL_TODAY_YEAR = REAL_TODAY.getFullYear()
 
 function MonthGrid({ events, selected, remindedIds, onSelectDay, onSelectEvent }) {
+  const [viewYear, setViewYear] = useState(REAL_TODAY_YEAR)
+  const [viewMonth, setViewMonth] = useState(REAL_TODAY_MONTH)
+
+  const isCurrentMonth = viewYear === REAL_TODAY_YEAR && viewMonth === REAL_TODAY_MONTH
+  const cells = useMemo(() => buildCells(viewYear, viewMonth), [viewYear, viewMonth])
+
+  const goToPrev = () => {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear((y) => y - 1) }
+    else { setViewMonth((m) => m - 1) }
+  }
+  const goToNext = () => {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear((y) => y + 1) }
+    else { setViewMonth((m) => m + 1) }
+  }
+  const goToToday = () => {
+    setViewYear(REAL_TODAY_YEAR)
+    setViewMonth(REAL_TODAY_MONTH)
+    onSelectDay(REAL_TODAY_DAY)
+  }
+
+  const todayLabel = `${REAL_TODAY_DAY} ${MONTH_NAMES[REAL_TODAY_MONTH].slice(0, 3)}`
+
+  // Only show events for the month that has data (Nov 2026)
+  const isEventMonth = viewYear === 2026 && viewMonth === 10
+  const monthEvents = isEventMonth ? events : []
+
   return (
     <div className="rounded-xl border border-line bg-white dark:border-slate-800 dark:bg-slate-900/60">
       <div className="flex items-center justify-between border-b border-line px-4 py-3 dark:border-slate-800">
         <div className="flex items-center gap-3">
-          <h2 className="text-base font-semibold tracking-tight">November 2026</h2>
-          <span className="text-xs tabular-nums text-zinc-500 dark:text-slate-400">{events.length} agenda</span>
+          <h2 className="text-base font-semibold tracking-tight">{MONTH_NAMES[viewMonth]} {viewYear}</h2>
+          <span className="text-xs tabular-nums text-zinc-500 dark:text-slate-400">{monthEvents.length} agenda</span>
         </div>
         <div className="flex items-center gap-1">
-          <button type="button" className="icon-btn" aria-label="Bulan sebelumnya">
+          <button type="button" className="icon-btn" aria-label="Bulan sebelumnya" onClick={goToPrev}>
             <ChevronLeft className="size-4" strokeWidth={1.75} />
           </button>
           <button
             type="button"
-            onClick={() => onSelectDay(TODAY)}
-            className="cursor-pointer touch-manipulation rounded-md border border-line px-2.5 py-1 text-xs font-medium hover:bg-zinc-50 dark:border-slate-700 dark:hover:bg-slate-800"
+            onClick={goToToday}
+            className={cn(
+              'cursor-pointer touch-manipulation rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-zinc-50 dark:border-slate-700 dark:hover:bg-slate-800',
+              isCurrentMonth
+                ? 'border-zinc-900 font-semibold text-zinc-900 dark:border-white dark:text-white'
+                : 'border-line',
+            )}
           >
-            Hari Ini (15 Nov)
+            Hari Ini ({todayLabel})
           </button>
-          <button type="button" className="icon-btn" aria-label="Bulan berikutnya">
+          <button type="button" className="icon-btn" aria-label="Bulan berikutnya" onClick={goToNext}>
             <ChevronRight className="size-4" strokeWidth={1.75} />
           </button>
         </div>
@@ -1319,7 +1370,7 @@ function MonthGrid({ events, selected, remindedIds, onSelectDay, onSelectEvent }
       </div>
 
       <div className="grid grid-cols-7">
-        {CELLS.map((cell, idx) => {
+        {cells.map((cell, idx) => {
           const col = idx % 7
           const border = cn(col < 6 && 'border-r', idx < 35 && 'border-b', 'border-line dark:border-slate-800')
           if (cell.muted) {
@@ -1335,18 +1386,18 @@ function MonthGrid({ events, selected, remindedIds, onSelectDay, onSelectEvent }
               </div>
             )
           }
-          const dayEvents = eventsOnDay(events, cell.day)
-          const isToday = cell.day === TODAY
-          const isSelected = cell.day === selected
+          const dayEvents = eventsOnDay(monthEvents, cell.day)
+          const isToday = isCurrentMonth && cell.day === REAL_TODAY_DAY
+          const isSelected = isCurrentMonth && cell.day === selected
           const weekend = col >= 5
 
           return (
             <div
-              key={cell.day}
-              onClick={() => onSelectDay(cell.day)}
+              key={`${viewYear}-${viewMonth}-${cell.day}`}
+              onClick={() => { if (isCurrentMonth) onSelectDay(cell.day) }}
               role="button"
               tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && onSelectDay(cell.day)}
+              onKeyDown={(e) => e.key === 'Enter' && isCurrentMonth && onSelectDay(cell.day)}
               className={cn(
                 border,
                 'flex min-h-16 cursor-pointer touch-manipulation flex-col gap-1 p-1.5 text-left transition-colors sm:min-h-[108px] sm:p-2',
