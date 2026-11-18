@@ -17,7 +17,6 @@ import {
   DEFAULT_CHECKLIST,
   EMAILJS_CONFIG,
   INITIAL_EVENTS,
-  TODAY,
 } from './data/calendarData'
 import { cn, downloadIcsFile, formatEventDateText } from './utils/calendarUtils'
 import LoginScreen from './components/LoginScreen'
@@ -31,25 +30,201 @@ import EventDetailModal from './components/EventDetailModal'
 import AddEventModal from './components/AddEventModal'
 
 export default function App() {
-  const [user, setUser] = useState(null)
-  const [activeTab, setActiveTab] = useState('dashboard')
-  const [dark, setDark] = useState(false)
+  // Sesi Pengguna Persisten di LocalStorage
+  const [user, setUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('smartcal-user')
+      return saved ? JSON.parse(saved) : null
+    } catch {
+      return null
+    }
+  })
+
+  // Tab Aktif Persisten di LocalStorage
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const saved = localStorage.getItem('smartcal-active-tab')
+      if (saved && ['dashboard', 'calendar', 'workspace'].includes(saved)) {
+        return saved
+      }
+    } catch {
+      /* ignore */
+    }
+    return 'dashboard'
+  })
+
+  const [dark, setDark] = useState(() => {
+    try {
+      const savedDark = localStorage.getItem('smartcal-theme') === 'dark'
+      if (savedDark) {
+        document.documentElement.classList.add('dark')
+      }
+      return savedDark
+    } catch {
+      return false
+    }
+  })
+
+  // Agenda Kampus Resmi (Firestore / Initial)
   const [events, setEvents] = useState(INITIAL_EVENTS)
   const [cloudSynced, setCloudSynced] = useState(false)
   const [active, setActive] = useState(() => new Set(CATEGORY_KEYS))
   const [query, setQuery] = useState('')
-  const [selectedDay, setSelectedDay] = useState(TODAY)
+
+  // State Tanggal Dinamis Real-Time Persisten di LocalStorage
+  const [now, setNow] = useState(() => new Date())
+  const [viewYear, setViewYear] = useState(() => {
+    try {
+      const saved = localStorage.getItem('smartcal-view-year')
+      if (saved && !isNaN(Number(saved))) return Number(saved)
+    } catch {
+      /* ignore */
+    }
+    return new Date().getFullYear()
+  })
+  const [viewMonth, setViewMonth] = useState(() => {
+    try {
+      const saved = localStorage.getItem('smartcal-view-month')
+      if (saved !== null && !isNaN(Number(saved))) return Number(saved)
+    } catch {
+      /* ignore */
+    }
+    return new Date().getMonth()
+  })
+  const [selectedDay, setSelectedDay] = useState(() => {
+    try {
+      const saved = localStorage.getItem('smartcal-selected-day')
+      if (saved && !isNaN(Number(saved))) return Number(saved)
+    } catch {
+      /* ignore */
+    }
+    return new Date().getDate()
+  })
+
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [view, setView] = useState('split')
   const [flashDay, setFlashDay] = useState(null)
-  const [remindedIds, setRemindedIds] = useState(() => new Set())
+
+  // Pengingat Pribadi / Custom Reminders (Inisialisasi Lazy Langsung dari LocalStorage)
+  const [customReminders, setCustomReminders] = useState(() => {
+    try {
+      const saved = localStorage.getItem('smartcal_custom_reminders_v1')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed)) return parsed
+      }
+    } catch {
+      /* ignore */
+    }
+    return []
+  })
+
+  // Status "Sudah Terkirim / Diaktifkan ke Gmail" (Inisialisasi Lazy dari LocalStorage)
+  const [remindedIds, setRemindedIds] = useState(() => {
+    try {
+      const savedUser = JSON.parse(localStorage.getItem('smartcal-user') || 'null')
+      if (savedUser?.email) {
+        const saved = JSON.parse(
+          localStorage.getItem(`smartcal-reminders-${savedUser.email.toLowerCase()}`) || '[]',
+        )
+        return new Set(saved.map(String))
+      }
+    } catch {
+      /* ignore */
+    }
+    return new Set()
+  })
+
   const [sendingEventId, setSendingEventId] = useState(null)
   const [allRemindersStats, setAllRemindersStats] = useState(() => new Map())
-  const [checklist, setChecklist] = useState(DEFAULT_CHECKLIST)
+
+  // Checklist Syarat Akademik & Persiapan (Inisialisasi Lazy dari LocalStorage)
+  const [checklist, setChecklist] = useState(() => {
+    try {
+      const saved = localStorage.getItem('smartcal_custom_requirements_v1')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      }
+      const savedUser = JSON.parse(localStorage.getItem('smartcal-user') || 'null')
+      if (savedUser?.email) {
+        const userSaved = localStorage.getItem(`smartcal-checklist-${savedUser.email.toLowerCase()}`)
+        if (userSaved) {
+          const parsed = JSON.parse(userSaved)
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    return DEFAULT_CHECKLIST
+  })
+
   const [toast, setToast] = useState(null)
   const searchRef = useRef(null)
   const seededRef = useRef(false)
+
+  // Perbarui waktu real-time setiap 1 detik untuk countdown dan deteksi pergantian hari otomatis
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(new Date())
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  // Sinkronisasi Tab & View State ke LocalStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('smartcal-active-tab', activeTab)
+    } catch {
+      /* ignore */
+    }
+  }, [activeTab])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('smartcal-view-year', String(viewYear))
+      localStorage.setItem('smartcal-view-month', String(viewMonth))
+      localStorage.setItem('smartcal-selected-day', String(selectedDay))
+    } catch {
+      /* ignore */
+    }
+  }, [viewYear, viewMonth, selectedDay])
+
+  // Sinkronisasi Custom Reminders ke LocalStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('smartcal_custom_reminders_v1', JSON.stringify(customReminders))
+    } catch {
+      /* ignore */
+    }
+  }, [customReminders])
+
+  // Sinkronisasi Checklist Syarat ke LocalStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('smartcal_custom_requirements_v1', JSON.stringify(checklist))
+      if (user?.email) {
+        localStorage.setItem(`smartcal-checklist-${user.email.toLowerCase()}`, JSON.stringify(checklist))
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [checklist, user?.email])
+
+  // Sinkronisasi remindedIds ke LocalStorage
+  useEffect(() => {
+    if (!user?.email) return
+    try {
+      localStorage.setItem(
+        `smartcal-reminders-${user.email.toLowerCase()}`,
+        JSON.stringify([...remindedIds]),
+      )
+    } catch {
+      /* ignore */
+    }
+  }, [remindedIds, user?.email])
 
   // Sinkronisasi Agenda dengan Firebase Firestore
   useEffect(() => {
@@ -65,7 +240,9 @@ export default function App() {
             INITIAL_EVENTS.forEach((item) => {
               const eventData = { ...item }
               delete eventData.id
-              addDoc(collection(db, 'events'), eventData).catch(() => {})
+              addDoc(collection(db, 'events'), eventData).catch(() => {
+                /* ignore */
+              })
             })
           }
         } else {
@@ -84,37 +261,9 @@ export default function App() {
     return () => unsubscribe()
   }, [])
 
-  // Muat & sinkronkan status "Sudah Terkirim ke Gmail" + Checklist per pengguna
+  // Sinkronkan pengingat real-time dari Firestore untuk user yang sedang login
   useEffect(() => {
-    if (!user?.email) {
-      setRemindedIds(new Set())
-      setChecklist(DEFAULT_CHECKLIST)
-      return
-    }
-
-    const emailKey = user.email.toLowerCase()
-    const storageKey = `smartcal-reminders-${emailKey}`
-    const checklistKey = `smartcal-checklist-${emailKey}`
-
-    try {
-      const saved = JSON.parse(localStorage.getItem(storageKey) || '[]')
-      setRemindedIds(new Set(saved.map(String)))
-    } catch {
-      setRemindedIds(new Set())
-    }
-
-    try {
-      const savedChk = JSON.parse(localStorage.getItem(checklistKey) || 'null')
-      if (Array.isArray(savedChk) && savedChk.length > 0) {
-        setChecklist(savedChk)
-      } else {
-        setChecklist(DEFAULT_CHECKLIST)
-      }
-    } catch {
-      setChecklist(DEFAULT_CHECKLIST)
-    }
-
-    if (!isFirebaseConfigured || !db) return
+    if (!user?.email || !isFirebaseConfigured || !db) return
 
     const q = firestoreQuery(
       collection(db, 'reminders'),
@@ -132,16 +281,23 @@ export default function App() {
             if (evId) merged.add(String(evId))
           })
           try {
-            localStorage.setItem(storageKey, JSON.stringify([...merged]))
-          } catch {}
+            localStorage.setItem(
+              `smartcal-reminders-${user.email.toLowerCase()}`,
+              JSON.stringify([...merged]),
+            )
+          } catch {
+            /* ignore */
+          }
           return merged
         })
       },
-      () => {},
+      () => {
+        /* ignore */
+      },
     )
 
     return () => unsubscribe()
-  }, [user])
+  }, [user?.email])
 
   // Statistik global pengingat dari Firestore (untuk Dashboard Admin)
   useEffect(() => {
@@ -156,18 +312,12 @@ export default function App() {
         })
         setAllRemindersStats(counts)
       },
-      () => {},
+      () => {
+        /* ignore */
+      },
     )
     return () => unsubscribe()
   }, [user])
-
-  useEffect(() => {
-    try {
-      const savedDark = localStorage.getItem('smartcal-theme') === 'dark'
-      setDark(savedDark)
-      document.documentElement.classList.toggle('dark', savedDark)
-    } catch {}
-  }, [])
 
   const toggleTheme = () => {
     setDark((prev) => {
@@ -175,7 +325,9 @@ export default function App() {
       document.documentElement.classList.toggle('dark', next)
       try {
         localStorage.setItem('smartcal-theme', next ? 'dark' : 'light')
-      } catch {}
+      } catch {
+        /* ignore */
+      }
       return next
     })
   }
@@ -197,16 +349,24 @@ export default function App() {
     setTimeout(() => setToast(null), 5000)
   }
 
+  // Gabungkan Agenda Kampus dan Pengingat Pribadi
+  const allEvents = useMemo(() => {
+    const map = new Map()
+    events.forEach((e) => map.set(String(e.id), e))
+    customReminders.forEach((r) => map.set(String(r.id), r))
+    return Array.from(map.values())
+  }, [events, customReminders])
+
   const facultyScopedEvents = useMemo(() => {
     if (!user) return []
     if (user.role === 'admin') {
-      return events.filter((e) => !e.isPersonal)
+      return allEvents.filter((e) => !e.isPersonal)
     }
-    return events.filter((e) => {
+    return allEvents.filter((e) => {
       if (e.isPersonal) return e.ownerEmail === user.email
       return e.faculty === 'Semua Fakultas' || e.faculty === user.faculty
     })
-  }, [events, user])
+  }, [allEvents, user])
 
   const visibleEvents = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -228,13 +388,66 @@ export default function App() {
     })
   }
 
-  const focusDay = (day) => {
+  const handlePrevMonth = () => {
+    setViewMonth((prevMonth) => {
+      if (prevMonth === 0) {
+        setViewYear((prevYear) => prevYear - 1)
+        return 11
+      }
+      return prevMonth - 1
+    })
+  }
+
+  const handleNextMonth = () => {
+    setViewMonth((prevMonth) => {
+      if (prevMonth === 11) {
+        setViewYear((prevYear) => prevYear + 1)
+        return 0
+      }
+      return prevMonth + 1
+    })
+  }
+
+  const handleJumpToToday = () => {
+    const today = new Date()
+    setViewYear(today.getFullYear())
+    setViewMonth(today.getMonth())
+    setSelectedDay(today.getDate())
+    focusDay(today.getDate(), today.getFullYear(), today.getMonth())
+  }
+
+  const focusDay = (day, year = viewYear, month = viewMonth) => {
     setSelectedDay(day)
-    const candidates = visibleEvents.filter((e) => e.start <= day).sort((a, b) => b.start - a.start)
-    const targetDay = document.getElementById(`tl-${day}`) ? day : candidates[0]?.start
-    if (targetDay === undefined) return
-    document.getElementById(`tl-${targetDay}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-    setFlashDay({ day: targetDay, key: Date.now() })
+    if (year !== viewYear) setViewYear(year)
+    if (month !== viewMonth) setViewMonth(month)
+    const targetDay = document.getElementById(`tl-${day}`) ? day : undefined
+    if (targetDay !== undefined) {
+      document.getElementById(`tl-${targetDay}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      setFlashDay({ day: targetDay, key: Date.now() })
+    }
+  }
+
+  const handleLogin = (u) => {
+    setUser(u)
+    try {
+      localStorage.setItem('smartcal-user', JSON.stringify(u))
+      const savedRem = JSON.parse(
+        localStorage.getItem(`smartcal-reminders-${u.email.toLowerCase()}`) || '[]',
+      )
+      setRemindedIds(new Set(savedRem.map(String)))
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const handleLogout = () => {
+    setUser(null)
+    setRemindedIds(new Set())
+    try {
+      localStorage.removeItem('smartcal-user')
+    } catch {
+      /* ignore */
+    }
   }
 
   // Fungsi Terpusat Pengiriman Pengingat Gmail (Dipakai oleh Modal Detail, Dashboard, & Timeline)
@@ -269,7 +482,9 @@ export default function App() {
             `smartcal-reminders-${user.email.toLowerCase()}`,
             JSON.stringify([...next]),
           )
-        } catch {}
+        } catch {
+          /* ignore */
+        }
         return next
       })
 
@@ -283,7 +498,9 @@ export default function App() {
           eventTitle: event.title,
           eventDate: dateText,
           createdAt: serverTimestamp(),
-        }).catch(() => {})
+        }).catch(() => {
+          /* ignore */
+        })
       }
     } catch (err) {
       console.error('Detail Error EmailJS:', err)
@@ -293,19 +510,153 @@ export default function App() {
     }
   }
 
+  // Pengingat Pribadi: Tambah & Hapus dengan LocalStorage Persisten
+  const handleAddCustomReminder = async (newReminder) => {
+    const reminderItem = {
+      id: `custom-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      ...newReminder,
+      category: 'pribadi',
+      isPersonal: true,
+      ownerEmail: user?.email || '',
+      faculty: user?.faculty || 'Semua Fakultas',
+      createdAt: new Date().toISOString(),
+    }
+    setCustomReminders((prev) => {
+      const next = [reminderItem, ...prev]
+      try {
+        localStorage.setItem('smartcal_custom_reminders_v1', JSON.stringify(next))
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+    showToast(`Pengingat "${reminderItem.title}" berhasil disimpan!`)
+    if (isFirebaseConfigured && db) {
+      addDoc(collection(db, 'events'), reminderItem).catch(() => {
+        /* ignore */
+      })
+    }
+    return reminderItem
+  }
+
+  const handleDeleteCustomReminder = async (id) => {
+    const idStr = String(id)
+    setCustomReminders((prev) => {
+      const next = prev.filter((r) => String(r.id) !== idStr)
+      try {
+        localStorage.setItem('smartcal_custom_reminders_v1', JSON.stringify(next))
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+    setRemindedIds((prev) => {
+      if (!prev.has(idStr)) return prev
+      const next = new Set(prev)
+      next.delete(idStr)
+      try {
+        if (user?.email) {
+          localStorage.setItem(
+            `smartcal-reminders-${user.email.toLowerCase()}`,
+            JSON.stringify([...next]),
+          )
+        }
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+    showToast('Pengingat berhasil dihapus')
+    if (isFirebaseConfigured && db && !idStr.startsWith('init-')) {
+      deleteDoc(doc(db, 'events', idStr)).catch(() => {
+        /* ignore */
+      })
+    }
+  }
+
+  const handleRemoveAcademicReminder = (id) => {
+    const idStr = String(id)
+    setRemindedIds((prev) => {
+      const next = new Set(prev)
+      next.delete(idStr)
+      try {
+        if (user?.email) {
+          localStorage.setItem(
+            `smartcal-reminders-${user.email.toLowerCase()}`,
+            JSON.stringify([...next]),
+          )
+        }
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+    showToast('Pengingat akademik dihapus dari daftar aktif')
+  }
+
+  // Checklist: Toggle, Tambah, dan Hapus Persisten
   const handleToggleChecklist = (itemId) => {
     setChecklist((prev) => {
       const next = prev.map((item) => (item.id === itemId ? { ...item, done: !item.done } : item))
-      if (user?.email) {
-        try {
+      try {
+        localStorage.setItem('smartcal_custom_requirements_v1', JSON.stringify(next))
+        if (user?.email) {
           localStorage.setItem(`smartcal-checklist-${user.email.toLowerCase()}`, JSON.stringify(next))
-        } catch {}
+        }
+      } catch {
+        /* ignore */
       }
       return next
     })
   }
 
+  const handleAddChecklistItem = (title, category = 'pribadi') => {
+    if (!title.trim()) return
+    const newItem = {
+      id: `chk-custom-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      title: title.trim(),
+      deadline: 'Tenggat Mandiri',
+      detail: 'Syarat / berkas tambahan yang ditambahkan sendiri.',
+      category: category || 'pribadi',
+      done: false,
+    }
+    setChecklist((prev) => {
+      const next = [newItem, ...prev]
+      try {
+        localStorage.setItem('smartcal_custom_requirements_v1', JSON.stringify(next))
+        if (user?.email) {
+          localStorage.setItem(`smartcal-checklist-${user.email.toLowerCase()}`, JSON.stringify(next))
+        }
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+    showToast(`Syarat "${newItem.title}" berhasil ditambahkan!`)
+  }
+
+  const handleDeleteChecklistItem = (itemId) => {
+    setChecklist((prev) => {
+      const next = prev.filter((item) => item.id !== itemId)
+      try {
+        localStorage.setItem('smartcal_custom_requirements_v1', JSON.stringify(next))
+        if (user?.email) {
+          localStorage.setItem(`smartcal-checklist-${user.email.toLowerCase()}`, JSON.stringify(next))
+        }
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+    showToast('Syarat berhasil dihapus')
+  }
+
+  // Tambah agenda resmi (Admin)
   const handleAddEvent = async (newEventData) => {
+    if (newEventData.isPersonal) {
+      await handleAddCustomReminder(newEventData)
+      return
+    }
     if (isFirebaseConfigured && db) {
       try {
         await addDoc(collection(db, 'events'), {
@@ -314,30 +665,39 @@ export default function App() {
         })
         showToast(`Agenda "${newEventData.title}" tersimpan di Firebase Firestore`)
         return
-      } catch {}
+      } catch {
+        /* ignore */
+      }
     }
     setEvents((prev) => [...prev, { id: String(Date.now()), ...newEventData }])
     showToast(`Agenda "${newEventData.title}" berhasil ditambahkan ke kalender`)
   }
 
   const handleDeleteEvent = async (ev) => {
-    if (isFirebaseConfigured && db && !String(ev.id).startsWith('init-')) {
-      try {
-        await deleteDoc(doc(db, 'events', String(ev.id)))
-      } catch {}
+    const idStr = String(ev.id)
+    if (ev.isPersonal) {
+      await handleDeleteCustomReminder(idStr)
+      return
     }
-    setEvents((prev) => prev.filter((item) => String(item.id) !== String(ev.id)))
+    if (isFirebaseConfigured && db && !idStr.startsWith('init-')) {
+      try {
+        await deleteDoc(doc(db, 'events', idStr))
+      } catch {
+        /* ignore */
+      }
+    }
+    setEvents((prev) => prev.filter((item) => String(item.id) !== idStr))
     showToast(`Agenda "${ev.title}" telah dihapus`)
   }
 
   const handleCopyWhatsApp = async (ev, dateText) => {
     const message = [
-      `📅 *INFO AKADEMIK UNKLAB*`,
+      `*INFO AKADEMIK UNKLAB*`,
       `*${ev.title}*`,
-      `🗓 Tanggal: ${dateText}`,
-      `⏰ Waktu: ${ev.time}`,
-      `📍 Lokasi: ${ev.location}`,
-      `🎓 Target: ${ev.faculty}`,
+      `Tanggal: ${dateText}`,
+      `Waktu: ${ev.time}`,
+      `Lokasi: ${ev.location}`,
+      `Target: ${ev.faculty}`,
       ``,
       `_${ev.description}_`,
       `— Dikirim via SmartCal UNKLAB`,
@@ -354,10 +714,7 @@ export default function App() {
   if (!user) {
     return (
       <LoginScreen
-        onLogin={(u) => {
-          setUser(u)
-          setActiveTab('dashboard')
-        }}
+        onLogin={handleLogin}
         dark={dark}
         onToggleTheme={toggleTheme}
       />
@@ -370,7 +727,7 @@ export default function App() {
     <div className="min-h-screen bg-canvas text-zinc-900 dark:bg-slate-950 dark:text-slate-100">
       <Navbar
         user={user}
-        onLogout={() => setUser(null)}
+        onLogout={handleLogout}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         remindedCount={remindedIds.size}
@@ -380,6 +737,7 @@ export default function App() {
         dark={dark}
         onToggleTheme={toggleTheme}
         cloudSynced={cloudSynced}
+        now={now}
       />
 
       <main className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
@@ -399,6 +757,11 @@ export default function App() {
             onExportIcs={() => {
               downloadIcsFile(facultyScopedEvents)
               showToast('File kalender (.ics) berhasil diunduh!')
+            }}
+            now={now}
+            onSelectDay={(day, year, month) => {
+              focusDay(day, year, month)
+              setActiveTab('calendar')
             }}
           />
         )}
@@ -429,8 +792,14 @@ export default function App() {
                   events={visibleEvents}
                   selected={selectedDay}
                   remindedIds={remindedIds}
-                  onSelectDay={focusDay}
+                  onSelectDay={(d) => focusDay(d, viewYear, viewMonth)}
                   onSelectEvent={setSelectedEvent}
+                  viewYear={viewYear}
+                  viewMonth={viewMonth}
+                  now={now}
+                  onPrevMonth={handlePrevMonth}
+                  onNextMonth={handleNextMonth}
+                  onJumpToToday={handleJumpToToday}
                 />
               )}
               <Timeline
@@ -441,6 +810,7 @@ export default function App() {
                 sendingEventId={sendingEventId}
                 onSendReminder={handleSendReminder}
                 onSelectEvent={setSelectedEvent}
+                now={now}
               />
             </section>
           </>
@@ -451,12 +821,23 @@ export default function App() {
             user={user}
             events={facultyScopedEvents}
             remindedIds={remindedIds}
+            sendingEventId={sendingEventId}
             checklist={checklist}
             onToggleChecklist={handleToggleChecklist}
+            onAddChecklistItem={handleAddChecklistItem}
+            onDeleteChecklistItem={handleDeleteChecklistItem}
             onSelectEvent={setSelectedEvent}
-            onAddPersonalEvent={handleAddEvent}
+            customReminders={customReminders}
+            onAddCustomReminder={handleAddCustomReminder}
+            onDeleteCustomReminder={handleDeleteCustomReminder}
+            onRemoveAcademicReminder={handleRemoveAcademicReminder}
+            onSendReminder={handleSendReminder}
+            onAddPersonalEvent={handleAddCustomReminder}
             onDeleteEvent={handleDeleteEvent}
             onOpenAddModal={() => setAddModalOpen(true)}
+            viewYear={viewYear}
+            viewMonth={viewMonth}
+            now={now}
           />
         )}
 
@@ -480,6 +861,9 @@ export default function App() {
         open={addModalOpen}
         onClose={() => setAddModalOpen(false)}
         onAdd={handleAddEvent}
+        viewYear={viewYear}
+        viewMonth={viewMonth}
+        now={now}
       />
 
       {toast && (

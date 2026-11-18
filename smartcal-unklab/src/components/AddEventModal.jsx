@@ -1,10 +1,21 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
-import { CAMPUS_CATEGORY_KEYS, CATEGORIES, FACULTIES } from '../data/calendarData'
+import { CAMPUS_CATEGORY_KEYS, CATEGORIES, FACULTIES, MONTH_NAMES } from '../data/calendarData'
 
-export default function AddEventModal({ open, onClose, onAdd }) {
+export default function AddEventModal({
+  open,
+  onClose,
+  onAdd,
+  viewYear,
+  viewMonth,
+  now = new Date(),
+}) {
+  const currentYear = viewYear ?? now.getFullYear()
+  const currentMonth = viewMonth ?? now.getMonth()
+  const maxDay = new Date(currentYear, currentMonth + 1, 0).getDate()
+
   const [title, setTitle] = useState('')
-  const [day, setDay] = useState(21)
+  const [day, setDay] = useState(() => Math.min(now.getDate(), maxDay))
   const [category, setCategory] = useState('akademik')
   const [faculty, setFaculty] = useState('Semua Fakultas')
   const [time, setTime] = useState('09.00 WITA')
@@ -14,14 +25,24 @@ export default function AddEventModal({ open, onClose, onAdd }) {
 
   if (!open) return null
 
+  const handleClose = () => {
+    setTitle('')
+    setLocation('')
+    setDescription('')
+    setDay(Math.min(now.getDate(), maxDay))
+    onClose()
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!title.trim() || saving) return
     setSaving(true)
-    const parsedDay = Math.min(30, Math.max(1, Number(day) || 15))
+    const parsedDay = Math.min(maxDay, Math.max(1, Number(day) || now.getDate()))
     await onAdd({
       start: parsedDay,
       end: parsedDay,
+      year: currentYear,
+      month: currentMonth,
       category,
       faculty,
       title: title.trim(),
@@ -39,7 +60,7 @@ export default function AddEventModal({ open, onClose, onAdd }) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-zinc-950/50 p-3 backdrop-blur-xs sm:p-4"
-      onClick={onClose}
+      onClick={handleClose}
     >
       <div
         className="my-auto max-h-[85dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-white p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900 sm:p-6"
@@ -47,7 +68,7 @@ export default function AddEventModal({ open, onClose, onAdd }) {
       >
         <div className="flex items-center justify-between border-b border-line pb-3 dark:border-slate-800">
           <h3 className="text-base font-semibold tracking-tight">Tambah Agenda Akademik Baru</h3>
-          <button type="button" onClick={onClose} className="icon-btn cursor-pointer">
+          <button type="button" onClick={handleClose} className="icon-btn cursor-pointer">
             <X className="size-4" />
           </button>
         </div>
@@ -68,12 +89,12 @@ export default function AddEventModal({ open, onClose, onAdd }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block font-medium text-zinc-600 dark:text-slate-400">
-                Tanggal (Nov 2026)
+                Tanggal ({MONTH_NAMES[currentMonth]} {currentYear})
               </label>
               <input
                 type="number"
                 min={1}
-                max={30}
+                max={maxDay}
                 value={day}
                 onChange={(e) => setDay(e.target.value)}
                 className="h-9 w-full rounded-lg border border-line bg-white px-3 text-sm focus:border-zinc-900 focus:outline-none dark:border-slate-800 dark:bg-slate-950"

@@ -1,30 +1,234 @@
-import { DAY_NAMES, TODAY } from '../data/calendarData'
+import { DAY_NAMES, MONTH_NAMES } from '../data/calendarData'
 
 export const cn = (...a) => a.flat().filter(Boolean).join(' ')
 
-export const weekdayOf = (day) => DAY_NAMES[(day - 1) % 7]
-
-export const eventsOnDay = (list, day) => list.filter((e) => day >= e.start && day <= e.end)
-
-export function formatEventDateText(event) {
-  return event.end > event.start
-    ? `${event.start} – ${event.end} November 2026`
-    : `${weekdayOf(event.start)}, ${event.start} November 2026`
+export const weekdayOf = (day, year = 2026, month = 10) => {
+  const d = new Date(year, month, day)
+  return DAY_NAMES[d.getDay()]
 }
 
-export function getRelativeDayLabel(startDay, endDay) {
-  if (TODAY >= startDay && TODAY <= endDay) return { text: 'Hari Ini', tone: 'rose' }
-  if (startDay < TODAY) return { text: 'Selesai', tone: 'muted' }
-  const diff = startDay - TODAY
-  if (diff === 1) return { text: 'Besok (H-1)', tone: 'amber' }
-  if (diff <= 4) return { text: `H-${diff} Hari`, tone: 'amber' }
-  return { text: `H-${diff} Hari`, tone: 'sky' }
+export function normalizeEventDate(event) {
+  if (!event) return null
+  return {
+    ...event,
+    year: event.year ?? 2026,
+    month: event.month ?? 10,
+  }
+}
+
+export const eventsOnDay = (list, day, year = 2026, month = 10) =>
+  list.filter((e) => {
+    const ey = e.year ?? 2026
+    const em = e.month ?? 10
+    return ey === year && em === month && day >= e.start && day <= e.end
+  })
+
+export function formatEventDateText(event) {
+  if (!event) return ''
+  const year = event.year ?? 2026
+  const month = event.month ?? 10
+  const monthName = MONTH_NAMES[month] ?? 'November'
+  return event.end > event.start
+    ? `${event.start} – ${event.end} ${monthName} ${year}`
+    : `${weekdayOf(event.start, year, month)}, ${event.start} ${monthName} ${year}`
+}
+
+/**
+ * Mengurai rentang waktu mulai dan selesai event secara presisi
+ */
+export function getEventDateRange(event) {
+  if (!event) {
+    const d = new Date()
+    return { startDateTime: d, endDateTime: d }
+  }
+
+  const year = event.year ?? 2026
+  const month = event.month ?? 10
+  const startDay = Number(event.start) || 1
+  const endDay = Number(event.end ?? event.start) || startDay
+
+  let startHour = 8
+  let startMinute = 0
+  if (event.time) {
+    const match = event.time.match(/(\d{1,2})[.:](\d{2})/)
+    if (match) {
+      startHour = parseInt(match[1], 10)
+      startMinute = parseInt(match[2], 10)
+    } else if (event.time.toLowerCase().includes('seharian')) {
+      startHour = 7
+      startMinute = 0
+    }
+  }
+
+  // Jam selesai default 17:00 WITA, atau 23:59 bila batas malam
+  let endHour = 17
+  let endMinute = 0
+  if (startHour >= 17 || (event.time && event.time.includes('23.59'))) {
+    endHour = 23
+    endMinute = 59
+  }
+
+  const startDateTime = new Date(year, month, startDay, startHour, startMinute, 0, 0)
+  const endDateTime = new Date(year, month, endDay, endHour, endMinute, 59, 999)
+
+  return { startDateTime, endDateTime }
+}
+
+/**
+ * Status dinamis event: ongoing, upcoming, atau completed
+ */
+export function getEventStatus(event, now = new Date()) {
+  if (!event) return null
+  const { startDateTime, endDateTime } = getEventDateRange(event)
+  const currentTime = now.getTime()
+  const startTime = startDateTime.getTime()
+  const endTime = endDateTime.getTime()
+
+  const year = event.year ?? 2026
+  const month = event.month ?? 10
+  const totalDays = Math.max(1, (event.end ?? event.start) - event.start + 1)
+
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const eventStartDay = new Date(year, month, event.start).getTime()
+  const dayIndex = Math.min(
+    totalDays,
+    Math.max(1, Math.floor((todayStart - eventStartDay) / 864e5) + 1),
+  )
+
+  // 1. Sudah Selesai
+  if (currentTime > endTime) {
+    return {
+      status: 'completed',
+      isOngoing: false,
+      isUpcoming: false,
+      isCompleted: true,
+      startDateTime,
+      endDateTime,
+      targetTime: null,
+      countdownLabel: 'Selesai',
+      badgeText: 'TELAH SELESAI',
+      badgeTone: 'muted',
+    }
+  }
+
+  // 2. Sedang Berlangsung (multi-day atau hari ini dalam jam aktif)
+  if (currentTime >= startTime && currentTime <= endTime) {
+    const badgeText =
+      totalDays > 1
+        ? `SEDANG BERLANGSUNG · Hari ke-${dayIndex} dari ${totalDays}`
+        : 'SEDANG BERLANGSUNG · Hari Ini'
+
+    return {
+      status: 'ongoing',
+      isOngoing: true,
+      isUpcoming: false,
+      isCompleted: false,
+      startDateTime,
+      endDateTime,
+      targetTime: endTime,
+      countdownLabel: 'Berakhir dalam:',
+      badgeText,
+      badgeTone: 'emerald',
+    }
+  }
+
+  // 3. Akan Datang
+  const rel = getRelativeDayLabel(event, now)
+  return {
+    status: 'upcoming',
+    isOngoing: false,
+    isUpcoming: true,
+    isCompleted: false,
+    startDateTime,
+    endDateTime,
+    targetTime: startTime,
+    countdownLabel: 'Dimulai dalam:',
+    badgeText: `AKAN DATANG · ${rel.text}`,
+    badgeTone: rel.tone,
+  }
+}
+
+/**
+ * Label hari relatif (Hari Ini, Besok (H-1), Berlangsung (Sisa X Hari), H-X Hari, Selesai)
+ */
+export function getRelativeDayLabel(eventOrStart, maybeEndOrNow, maybeNow) {
+  let startDay
+  let endDay
+  let year = 2026
+  let month = 10
+  let now = new Date()
+
+  if (typeof eventOrStart === 'object' && eventOrStart !== null) {
+    startDay = Number(eventOrStart.start) || 1
+    endDay = Number(eventOrStart.end ?? eventOrStart.start) || startDay
+    year = eventOrStart.year ?? 2026
+    month = eventOrStart.month ?? 10
+    if (maybeEndOrNow instanceof Date) {
+      now = maybeEndOrNow
+    }
+  } else {
+    startDay = Number(eventOrStart) || 1
+    if (typeof maybeEndOrNow === 'number') {
+      endDay = maybeEndOrNow
+      if (maybeNow instanceof Date) now = maybeNow
+    } else {
+      endDay = startDay
+      if (maybeEndOrNow instanceof Date) now = maybeEndOrNow
+    }
+  }
+
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const startDate = new Date(year, month, startDay).getTime()
+  const endDate = new Date(year, month, endDay).getTime()
+  const oneDay = 864e5
+
+  // Sedang aktif dalam rentang hari
+  if (todayStart >= startDate && todayStart <= endDate) {
+    if (endDate > startDate) {
+      const remainingDays = Math.max(0, Math.round((endDate - todayStart) / oneDay))
+      if (remainingDays === 0) {
+        return { text: 'Berlangsung (Hari Terakhir)', tone: 'emerald' }
+      }
+      return { text: `Berlangsung (Sisa ${remainingDays} Hari)`, tone: 'emerald' }
+    }
+    return { text: 'Hari Ini', tone: 'rose' }
+  }
+
+  if (todayStart > endDate) {
+    return { text: 'Selesai', tone: 'muted' }
+  }
+
+  const diffDays = Math.round((startDate - todayStart) / oneDay)
+  if (diffDays === 1) {
+    return { text: 'Besok (H-1)', tone: 'amber' }
+  }
+  if (diffDays <= 4) {
+    return { text: `H-${diffDays} Hari`, tone: 'amber' }
+  }
+  return { text: `H-${diffDays} Hari`, tone: 'sky' }
+}
+
+export function getEventTargetTime(event) {
+  if (!event) return 0
+  const status = getEventStatus(event)
+  return status?.targetTime || 0
 }
 
 export function buildGoogleCalendarUrl(event) {
   const pad2 = (n) => String(n).padStart(2, '0')
-  const startDate = `202611${pad2(event.start)}`
-  const endDate = `202611${pad2(Math.min(30, event.end + 1))}`
+  const year = event.year ?? 2026
+  const month = (event.month ?? 10) + 1
+  const lastDayOfMonth = new Date(year, month, 0).getDate()
+  const startDate = `${year}${pad2(month)}${pad2(event.start)}`
+  const endDay = event.end + 1
+  let endDate
+  if (endDay > lastDayOfMonth) {
+    const nextDate = new Date(year, month - 1, event.end + 1)
+    endDate = `${nextDate.getFullYear()}${pad2(nextDate.getMonth() + 1)}${pad2(nextDate.getDate())}`
+  } else {
+    endDate = `${year}${pad2(month)}${pad2(endDay)}`
+  }
+
   const params = new URLSearchParams({
     action: 'TEMPLATE',
     text: `[SmartCal UNKLAB] ${event.title}`,
@@ -35,17 +239,26 @@ export function buildGoogleCalendarUrl(event) {
   return `https://calendar.google.com/calendar/render?${params.toString()}`
 }
 
-export function downloadIcsFile(eventList, label = 'SmartCal-UNKLAB-Nov2026') {
+export function downloadIcsFile(eventList, label = 'SmartCal-UNKLAB') {
   const pad2 = (n) => String(n).padStart(2, '0')
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//SmartCal UNKLAB//Kalender Akademik 2026//ID',
+    'PRODID:-//SmartCal UNKLAB//Kalender Akademik//ID',
     'CALSCALE:GREGORIAN',
   ]
   eventList.forEach((ev) => {
-    const dtStart = `202611${pad2(ev.start)}`
-    const dtEnd = `202611${pad2(Math.min(30, ev.end + 1))}`
+    const year = ev.year ?? 2026
+    const month = (ev.month ?? 10) + 1
+    const lastDayOfMonth = new Date(year, month, 0).getDate()
+    const dtStart = `${year}${pad2(month)}${pad2(ev.start)}`
+    let dtEnd
+    if (ev.end + 1 > lastDayOfMonth) {
+      const nextDate = new Date(year, month - 1, ev.end + 1)
+      dtEnd = `${nextDate.getFullYear()}${pad2(nextDate.getMonth() + 1)}${pad2(nextDate.getDate())}`
+    } else {
+      dtEnd = `${year}${pad2(month)}${pad2(ev.end + 1)}`
+    }
     lines.push(
       'BEGIN:VEVENT',
       `UID:smartcal-${ev.id}@unklab.ac.id`,

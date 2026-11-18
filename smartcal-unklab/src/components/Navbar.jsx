@@ -10,7 +10,8 @@ import {
   Sun,
   User,
 } from 'lucide-react'
-import { cn } from '../utils/calendarUtils'
+import { MONTH_NAMES } from '../data/calendarData'
+import { cn, weekdayOf } from '../utils/calendarUtils'
 
 export default function Navbar({
   user,
@@ -24,6 +25,7 @@ export default function Navbar({
   dark,
   onToggleTheme,
   cloudSynced,
+  now = new Date(),
 }) {
   const initials = user.name
     .split(' ')
@@ -88,6 +90,15 @@ export default function Navbar({
             )
           })}
         </nav>
+
+        {/* Tanggal Real-Time Header */}
+        <div className="hidden items-center gap-1.5 rounded-full border border-line bg-white/70 px-2.5 py-1 text-xs text-zinc-600 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300 lg:inline-flex">
+          <span className="size-1.5 rounded-full bg-emerald-500" />
+          <span className="font-medium tabular-nums">
+            {weekdayOf(now.getDate(), now.getFullYear(), now.getMonth())}, {now.getDate()}{' '}
+            {MONTH_NAMES[now.getMonth()]} {now.getFullYear()}
+          </span>
+        </div>
 
         {cloudSynced && (
           <span
