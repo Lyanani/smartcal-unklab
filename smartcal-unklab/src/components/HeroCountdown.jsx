@@ -10,7 +10,7 @@ const getParts = (diff) => [
   { label: 'Detik', value: Math.floor(diff / 1e3) % 60 },
 ]
 
-export default function HeroCountdown({ user, events = [], now = new Date() }) {
+export default function HeroCountdown({ user, facultyScope = 'all', events = [], now = new Date() }) {
   const [currentTime, setCurrentTime] = useState(() => Date.now())
   const [index, setIndex] = useState(0)
 
@@ -61,7 +61,7 @@ export default function HeroCountdown({ user, events = [], now = new Date() }) {
               <span className="size-1.5 rounded-full bg-sky-500" /> Agenda Krusial Terdekat
             </span>
             <span>
-              {user?.role === 'admin' ? 'Mode admin' : `Filter Aktif: ${user?.faculty || 'Semua Fakultas'}`}
+              {user?.role === 'admin' ? 'Mode admin' : facultyScope === 'faculty' ? `Khusus ${user?.faculty}` : facultyScope === 'general' ? 'Kalender General (Semua Fakultas)' : `${user?.faculty} & General`}
             </span>
           </div>
 

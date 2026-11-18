@@ -20,6 +20,7 @@ import QuickRemindButton from './QuickRemindButton'
 
 export default function DashboardTab({
   user,
+  facultyScope = 'all',
   events,
   remindedIds,
   sendingEventId,
@@ -156,7 +157,7 @@ export default function DashboardTab({
       </div>
 
       {/* ── Hero Countdown Card ─────────────────────────────────────────── */}
-      <HeroCountdown user={user} events={events} now={now} />
+      <HeroCountdown user={user} facultyScope={facultyScope} events={events} now={now} />
 
       {/* 4 Kartu KPI */}
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Ringkasan statistik">

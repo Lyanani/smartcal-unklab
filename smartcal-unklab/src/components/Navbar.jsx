@@ -13,6 +13,8 @@ import { cn, weekdayOf } from '../utils/calendarUtils'
 
 export default function Navbar({
   user,
+  facultyScope = 'all',
+  onFacultyScopeChange,
   onLogout,
   activeTab,
   onTabChange,
@@ -104,6 +106,34 @@ export default function Navbar({
           >
             <Database className="size-2.5" /> Firestore Live
           </span>
+        )}
+
+                {user.role !== 'admin' && onFacultyScopeChange && (
+          <div
+            role="group"
+            aria-label="Filter cakupan kalender"
+            className="inline-flex items-center rounded-lg border border-line bg-canvas p-0.5 text-[11px] font-medium dark:border-slate-800 dark:bg-slate-950"
+          >
+            {[
+              { id: 'all', label: 'Semua' },
+              { id: 'faculty', label: 'Khusus Fakultas' },
+              { id: 'general', label: 'General' },
+            ].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onFacultyScopeChange(item.id)}
+                className={cn(
+                  'cursor-pointer whitespace-nowrap rounded-md px-2 py-1 transition',
+                  facultyScope === item.id
+                    ? 'bg-zinc-900 text-white shadow-2xs dark:bg-white dark:text-slate-950'
+                    : 'text-zinc-500 hover:text-zinc-900 dark:text-slate-400 dark:hover:text-slate-100',
+                )}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         )}
 
         <div className="ml-auto flex items-center gap-2">
