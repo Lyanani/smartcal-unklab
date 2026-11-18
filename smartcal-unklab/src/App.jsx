@@ -37,6 +37,8 @@ import Timeline from './components/Timeline'
 import WorkspaceTab from './components/WorkspaceTab'
 import EventDetailModal from './components/EventDetailModal'
 import AddEventModal from './components/AddEventModal'
+import GuestDashboard from './components/guest/GuestDashboard'
+import { GUEST_EVENTS } from './data/guestCalendar'
 import EditEventModal from './components/EditEventModal'
 import './App.css'
 
@@ -52,6 +54,7 @@ export default function App() {
   })
 
   // Tab Aktif Persisten di LocalStorage
+  const [showLogin, setShowLogin] = useState(false)
   const [activeTab, setActiveTab] = useState(() => {
     try {
       const saved = localStorage.getItem('smartcal-active-tab')
@@ -509,6 +512,7 @@ export default function App() {
     setRemindedIds(new Set())
     try {
       localStorage.removeItem('smartcal-user')
+    setShowLogin(false)
     } catch {
       /* ignore */
     }
@@ -848,8 +852,19 @@ export default function App() {
   }
 
   if (!user) {
+    if (!showLogin) {
+      return (
+        <GuestDashboard
+          events={GUEST_EVENTS}
+          onLogin={() => setShowLogin(true)}
+          dark={dark}
+          onToggleTheme={toggleTheme}
+        />
+      )
+    }
     return (
       <LoginScreen
+        onBack={() => setShowLogin(false)}
         onLogin={handleLogin}
         dark={dark}
         onToggleTheme={toggleTheme}
