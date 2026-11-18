@@ -29,7 +29,7 @@ export default function AddEventModal({ open, onClose, onAdd }) {
       title: title.trim(),
       time: time.trim() || '08.00 WITA',
       location: location.trim() || 'Kampus UNKLAB',
-      description: description.trim() || 'Agenda resmi ditambahkan oleh Admin Akademik.',
+      description: description.trim() || 'Agenda resmi ditambahkan oleh admin.',
     })
     setSaving(false)
     setTitle('')

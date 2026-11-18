@@ -45,7 +45,7 @@ export default function AdminScheduleWorkspace({
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Header Eksekutif Pengelola Agenda BAA */}
+        {/* Header Pengelola Agenda Admin */}
       <div className="flex flex-col justify-between gap-4 rounded-2xl border border-line bg-gradient-to-br from-white via-white to-zinc-50/90 p-5 shadow-2xs backdrop-blur dark:border-slate-800 dark:from-slate-900/90 dark:via-slate-900/80 dark:to-slate-950 sm:p-6 lg:flex-row lg:items-center">
         <div className="flex items-start gap-3.5">
           <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-zinc-900 text-white shadow-xs dark:bg-white dark:text-slate-950">
@@ -64,7 +64,7 @@ export default function AdminScheduleWorkspace({
               </span>
             </div>
             <p className="text-xs leading-relaxed text-zinc-500 dark:text-slate-400">
-              Pusat kendali BAA: ubah detail, perbarui tanggal/lokasi, atau hapus agenda resmi kampus. Perubahan langsung tersinkronisasi otomatis ke seluruh kalender mahasiswa.
+                Pusat kendali admin: ubah detail, perbarui tanggal/lokasi, atau hapus agenda resmi kampus. Perubahan langsung tersinkronisasi otomatis ke seluruh kalender mahasiswa.
             </p>
           </div>
         </div>
