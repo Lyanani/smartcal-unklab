@@ -29,6 +29,7 @@ import {
 } from './data/calendarData'
 import { cn, downloadIcsFile, formatEventDateText } from './utils/calendarUtils'
 import LoginScreen from './components/LoginScreen'
+import FacultyPortalView from './components/FacultyPortalView'
 import Navbar from './components/Navbar'
 import DashboardTab from './components/DashboardTab'
 import FilterBar from './components/FilterBar'
@@ -496,6 +497,7 @@ export default function App() {
 
   const handleLogin = (u) => {
     setUser(u)
+    setViewMode(u.role === 'admin' ? 'general' : 'faculty')
     try {
       localStorage.setItem('smartcal-user', JSON.stringify(u))
       const savedRem = JSON.parse(
@@ -866,6 +868,25 @@ export default function App() {
       <LoginScreen
         onBack={() => setShowLogin(false)}
         onLogin={handleLogin}
+        dark={dark}
+        onToggleTheme={toggleTheme}
+      />
+    )
+  }
+
+  if (user && user.role !== 'admin' && viewMode === 'faculty') {
+    return (
+      <FacultyPortalView
+        user={user}
+        events={allEvents}
+        remindedIds={remindedIds}
+        sendingEventId={sendingEventId}
+        onSendReminder={handleSendReminder}
+        onOpenGeneral={() => {
+          setFacultyScope('all')
+          setViewMode('general')
+        }}
+        onLogout={handleLogout}
         dark={dark}
         onToggleTheme={toggleTheme}
       />

@@ -15,6 +15,7 @@ export default function Navbar({
   user,
   facultyScope = 'all',
   onFacultyScopeChange,
+  onOpenFacultyMode,
   onLogout,
   activeTab,
   onTabChange,
@@ -137,6 +138,15 @@ export default function Navbar({
         )}
 
         <div className="ml-auto flex items-center gap-2">
+          {user.role !== 'admin' && onOpenFacultyMode && (
+            <button
+              type="button"
+              onClick={onOpenFacultyMode}
+              className="inline-flex h-8 cursor-pointer touch-manipulation items-center gap-1 rounded-md border border-line bg-white px-2.5 text-xs font-medium text-zinc-700 transition hover:bg-zinc-100 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              ← Mode Fakultas
+            </button>
+          )}
           {activeTab === 'calendar' && (
             <label className="relative hidden lg:block">
               <span className="sr-only">Cari agenda</span>
