@@ -23,4 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 .env
+ai/functions/.env
+ai/functions/.env.*
+!ai/functions/.env.example
 

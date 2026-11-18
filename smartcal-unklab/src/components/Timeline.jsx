@@ -4,7 +4,7 @@ import { CATEGORIES, TODAY } from '../data/calendarData'
 import { cn, weekdayOf } from '../utils/calendarUtils'
 import QuickRemindButton from './QuickRemindButton'
 
-export default function Timeline({ events, flashDay, constrained, remindedIds, sendingEventId, onSendReminder, onSelectEvent }) {
+export default function Timeline({ events, flashDay, constrained, isGuest, remindedIds, sendingEventId, onSendReminder, onSelectEvent }) {
   const sorted = [...events].sort((a, b) => a.start - b.start)
   const groups = new Map()
   for (const event of sorted) {
@@ -28,7 +28,7 @@ export default function Timeline({ events, flashDay, constrained, remindedIds, s
         </h2>
         <span className="inline-flex items-center gap-1.5 text-xs text-zinc-500 dark:text-slate-400">
           <Sparkles className="size-[13px]" strokeWidth={1.75} />
-          Tap agenda / tombol Gmail
+          {isGuest ? 'Pilih agenda untuk melihat detail' : 'Tap agenda / tombol Gmail'}
         </span>
       </div>
 
@@ -103,12 +103,14 @@ export default function Timeline({ events, flashDay, constrained, remindedIds, s
 
                           <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-line/70 pt-2 text-[11px] dark:border-slate-800/80">
                             <span className="truncate text-zinc-400 dark:text-slate-500">{event.faculty}</span>
-                            <QuickRemindButton
-                              event={event}
-                              isSent={isReminded}
-                              isSending={isSending}
-                              onSend={onSendReminder}
-                            />
+                            {!isGuest && (
+                              <QuickRemindButton
+                                event={event}
+                                isSent={isReminded}
+                                isSending={isSending}
+                                onSend={onSendReminder}
+                              />
+                            )}
                           </div>
                         </article>
                       )

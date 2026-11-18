@@ -94,6 +94,7 @@ export default function EventDetailModal({ event, user, isReminded, isSending, o
           </p>
         </div>
 
+        {user.role !== 'guest' && (
         <div className="mt-5 flex flex-col gap-2.5 border-t border-line pt-4 dark:border-slate-800">
           <div className="flex flex-col gap-2 sm:flex-row">
             <button
@@ -120,7 +121,7 @@ export default function EventDetailModal({ event, user, isReminded, isSending, o
               ) : (
                 <>
                   <Mail className="size-4" />
-                  Ingatkan ke Gmail (H-1)
+                  {user.role === 'guest' ? 'Masuk untuk pengingat Gmail' : 'Ingatkan ke Gmail (H-1)'}
                 </>
               )}
             </button>
@@ -146,6 +147,7 @@ export default function EventDetailModal({ event, user, isReminded, isSending, o
             Salin Format Pengumuman Grup WhatsApp
           </button>
         </div>
+        )}
       </div>
     </div>
   )

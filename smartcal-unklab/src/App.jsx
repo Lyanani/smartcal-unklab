@@ -1,17 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import emailjs from '@emailjs/browser'
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  onSnapshot,
-  query as firestoreQuery,
-  serverTimestamp,
-  where,
-} from 'firebase/firestore'
-import { db, isFirebaseConfigured } from './firebase'
+import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { CheckCircle2, X } from 'lucide-react'
+import { auth } from './firebase'
 import {
   CATEGORY_KEYS,
   DEFAULT_CHECKLIST,
@@ -30,12 +21,53 @@ import WorkspaceTab from './components/WorkspaceTab'
 import EventDetailModal from './components/EventDetailModal'
 import AddEventModal from './components/AddEventModal'
 
+const LOCAL_EVENTS_KEY = 'smartcal-events-v1'
+const GUEST_USER = { role: 'guest', email: '', name: 'Tamu', faculty: 'Semua Fakultas' }
+
+function loadLocalEvents() {
+  try {
+    const saved = localStorage.getItem(LOCAL_EVENTS_KEY)
+    if (saved === null) return { events: INITIAL_EVENTS, error: null }
+
+    const parsed = JSON.parse(saved)
+    if (!Array.isArray(parsed)) throw new Error('Data jadwal lokal bukan daftar agenda.')
+    return { events: parsed, error: null }
+  } catch (error) {
+    console.error('Gagal memuat agenda lokal.', error)
+    return {
+      events: INITIAL_EVENTS,
+      error: 'Jadwal lokal gagal dibaca. Kalender awal ditampilkan.',
+    }
+  }
+}
+
+function getStudentUser(firebaseUser) {
+  const email = firebaseUser?.email
+  if (!email) return null
+
+  const emailName = email
+    .split('@')[0]
+    .replace(/[._]/g, ' ')
+    .split(' ')
+    .map((word) => (word ? word[0].toUpperCase() + word.slice(1) : ''))
+    .join(' ')
+
+  return {
+    role: 'mahasiswa',
+    email,
+    name: firebaseUser.displayName || emailName || 'Mahasiswa UNKLAB',
+    faculty: 'Semua Fakultas',
+  }
+}
+
 export default function App() {
+  const [initialLocalEvents] = useState(loadLocalEvents)
   const [user, setUser] = useState(null)
+  const [authReady, setAuthReady] = useState(!auth)
+  const [authError, setAuthError] = useState('')
   const [activeTab, setActiveTab] = useState('dashboard')
   const [dark, setDark] = useState(false)
-  const [events, setEvents] = useState(INITIAL_EVENTS)
-  const [cloudSynced, setCloudSynced] = useState(false)
+  const [events, setEvents] = useState(initialLocalEvents.events)
   const [active, setActive] = useState(() => new Set(CATEGORY_KEYS))
   const [query, setQuery] = useState('')
   const [selectedDay, setSelectedDay] = useState(TODAY)
@@ -45,59 +77,44 @@ export default function App() {
   const [flashDay, setFlashDay] = useState(null)
   const [remindedIds, setRemindedIds] = useState(() => new Set())
   const [sendingEventId, setSendingEventId] = useState(null)
-  const [allRemindersStats, setAllRemindersStats] = useState(() => new Map())
   const [checklist, setChecklist] = useState(DEFAULT_CHECKLIST)
-  const [toast, setToast] = useState(null)
+  const [toast, setToast] = useState(initialLocalEvents.error)
   const searchRef = useRef(null)
-  const seededRef = useRef(false)
 
-  // Sinkronisasi Agenda dengan Firebase Firestore
   useEffect(() => {
-    if (!isFirebaseConfigured || !db) return
+    if (!auth) return
 
-    const unsubscribe = onSnapshot(
-      collection(db, 'events'),
-      (snapshot) => {
-        setCloudSynced(true)
-        if (snapshot.empty) {
-          if (!seededRef.current) {
-            seededRef.current = true
-            INITIAL_EVENTS.forEach((item) => {
-              const eventData = { ...item }
-              delete eventData.id
-              addDoc(collection(db, 'events'), eventData).catch(() => {})
-            })
-          }
-        } else {
-          const firestoreEvents = snapshot.docs.map((d) => ({
-            id: d.id,
-            ...d.data(),
-          }))
-          setEvents(firestoreEvents)
-        }
+    return onAuthStateChanged(
+      auth,
+      (firebaseUser) => {
+        setUser((currentUser) => {
+          if (currentUser?.role === 'admin') return currentUser
+          return firebaseUser ? getStudentUser(firebaseUser) : null
+        })
+        setAuthReady(true)
       },
-      () => {
-        setCloudSynced(false)
+      (error) => {
+        console.error('Firebase Authentication gagal memeriksa sesi.', error)
+        setAuthError('Sesi akun tidak dapat diperiksa. Coba muat ulang aplikasi.')
+        setAuthReady(true)
       },
     )
-
-    return () => unsubscribe()
   }, [])
 
-  // Muat & sinkronkan status "Sudah Terkirim ke Gmail" + Checklist per pengguna
+  // Muat status pengingat dan checklist dari browser untuk pengguna aktif.
   useEffect(() => {
-    if (!user?.email) {
+    if (!user) {
       setRemindedIds(new Set())
       setChecklist(DEFAULT_CHECKLIST)
       return
     }
 
-    const emailKey = user.email.toLowerCase()
-    const storageKey = `smartcal-reminders-${emailKey}`
-    const checklistKey = `smartcal-checklist-${emailKey}`
+    const emailKey = user.email?.toLowerCase()
+    const storageKey = emailKey ? `smartcal-reminders-${emailKey}` : ''
+    const checklistKey = `smartcal-checklist-${emailKey || 'guest'}`
 
     try {
-      const saved = JSON.parse(localStorage.getItem(storageKey) || '[]')
+      const saved = emailKey ? JSON.parse(localStorage.getItem(storageKey) || '[]') : []
       setRemindedIds(new Set(saved.map(String)))
     } catch {
       setRemindedIds(new Set())
@@ -113,52 +130,6 @@ export default function App() {
     } catch {
       setChecklist(DEFAULT_CHECKLIST)
     }
-
-    if (!isFirebaseConfigured || !db) return
-
-    const q = firestoreQuery(
-      collection(db, 'reminders'),
-      where('userEmail', '==', user.email),
-    )
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        if (snapshot.empty) return
-        setRemindedIds((prev) => {
-          const merged = new Set(prev)
-          snapshot.docs.forEach((d) => {
-            const evId = d.data()?.eventId
-            if (evId) merged.add(String(evId))
-          })
-          try {
-            localStorage.setItem(storageKey, JSON.stringify([...merged]))
-          } catch {}
-          return merged
-        })
-      },
-      () => {},
-    )
-
-    return () => unsubscribe()
-  }, [user])
-
-  // Statistik global pengingat dari Firestore (untuk Dashboard Admin)
-  useEffect(() => {
-    if (!isFirebaseConfigured || !db || user?.role !== 'admin') return
-    const unsubscribe = onSnapshot(
-      collection(db, 'reminders'),
-      (snapshot) => {
-        const counts = new Map()
-        snapshot.docs.forEach((d) => {
-          const evId = String(d.data()?.eventId || '')
-          if (evId) counts.set(evId, (counts.get(evId) || 0) + 1)
-        })
-        setAllRemindersStats(counts)
-      },
-      () => {},
-    )
-    return () => unsubscribe()
   }, [user])
 
   useEffect(() => {
@@ -197,14 +168,32 @@ export default function App() {
     setTimeout(() => setToast(null), 5000)
   }
 
+  const updateLocalEvents = (update, errorMessage) => {
+    try {
+      const saved = localStorage.getItem(LOCAL_EVENTS_KEY)
+      const current = saved === null ? events : JSON.parse(saved)
+      if (!Array.isArray(current)) throw new Error('Data jadwal lokal bukan daftar agenda.')
+
+      const next = update(current)
+      localStorage.setItem(LOCAL_EVENTS_KEY, JSON.stringify(next))
+      setEvents(next)
+      return true
+    } catch (error) {
+      console.error('Gagal menyimpan agenda lokal.', error)
+      showToast(errorMessage)
+      return false
+    }
+  }
+
   const facultyScopedEvents = useMemo(() => {
     if (!user) return []
     if (user.role === 'admin') {
       return events.filter((e) => !e.isPersonal)
     }
+    if (user.role === 'guest') return events.filter((e) => !e.isPersonal)
     return events.filter((e) => {
-      if (e.isPersonal) return e.ownerEmail === user.email
-      return e.faculty === 'Semua Fakultas' || e.faculty === user.faculty
+      if (e.isPersonal) return e.ownerEmail === (user.email || 'guest')
+      return true
     })
   }, [events, user])
 
@@ -239,7 +228,11 @@ export default function App() {
 
   // Fungsi Terpusat Pengiriman Pengingat Gmail (Dipakai oleh Modal Detail, Dashboard, & Timeline)
   const handleSendReminder = async (event) => {
-    if (!event || !user?.email) return
+    if (!event) return
+    if (!user?.email) {
+      showToast('Masuk dengan akun untuk mengirim pengingat ke Gmail.')
+      return
+    }
     const idStr = String(event.id)
     if (remindedIds.has(idStr) || sendingEventId) return
 
@@ -262,29 +255,19 @@ export default function App() {
         EMAILJS_CONFIG.PUBLIC_KEY,
       )
 
-      setRemindedIds((prev) => {
-        const next = new Set(prev).add(idStr)
-        try {
-          localStorage.setItem(
-            `smartcal-reminders-${user.email.toLowerCase()}`,
-            JSON.stringify([...next]),
-          )
-        } catch {}
-        return next
-      })
-
-      showToast(`Terkirim! Pengingat "${event.title}" telah masuk ke ${user.email}`)
-
-      if (isFirebaseConfigured && db) {
-        addDoc(collection(db, 'reminders'), {
-          userEmail: user.email,
-          userName: user.name,
-          eventId: idStr,
-          eventTitle: event.title,
-          eventDate: dateText,
-          createdAt: serverTimestamp(),
-        }).catch(() => {})
+      const nextRemindedIds = new Set(remindedIds).add(idStr)
+      setRemindedIds(nextRemindedIds)
+      try {
+        localStorage.setItem(
+          `smartcal-reminders-${user.email.toLowerCase()}`,
+          JSON.stringify([...nextRemindedIds]),
+        )
+        showToast(`Terkirim! Pengingat "${event.title}" telah masuk ke ${user.email}`)
+      } catch (storageError) {
+        console.error('Gagal menyimpan status pengingat lokal.', storageError)
+        showToast(`Pengingat terkirim, tetapi statusnya gagal disimpan di browser.`)
       }
+
     } catch (err) {
       console.error('Detail Error EmailJS:', err)
       alert(`Gagal kirim ke Gmail: ${err?.text || err?.message || 'Periksa koneksi internet atau EmailJS'}`)
@@ -294,40 +277,48 @@ export default function App() {
   }
 
   const handleToggleChecklist = (itemId) => {
-    setChecklist((prev) => {
-      const next = prev.map((item) => (item.id === itemId ? { ...item, done: !item.done } : item))
-      if (user?.email) {
-        try {
-          localStorage.setItem(`smartcal-checklist-${user.email.toLowerCase()}`, JSON.stringify(next))
-        } catch {}
-      }
-      return next
-    })
-  }
-
-  const handleAddEvent = async (newEventData) => {
-    if (isFirebaseConfigured && db) {
+    const next = checklist.map((item) => (item.id === itemId ? { ...item, done: !item.done } : item))
+    if (user) {
       try {
-        await addDoc(collection(db, 'events'), {
-          ...newEventData,
-          createdAt: serverTimestamp(),
-        })
-        showToast(`Agenda "${newEventData.title}" tersimpan di Firebase Firestore`)
+        const ownerKey = user.email?.toLowerCase() || 'guest'
+        localStorage.setItem(`smartcal-checklist-${ownerKey}`, JSON.stringify(next))
+      } catch (error) {
+        console.error('Gagal menyimpan checklist lokal.', error)
+        showToast('Checklist gagal disimpan di browser.')
         return
-      } catch {}
+      }
     }
-    setEvents((prev) => [...prev, { id: String(Date.now()), ...newEventData }])
-    showToast(`Agenda "${newEventData.title}" berhasil ditambahkan ke kalender`)
+    setChecklist(next)
   }
 
-  const handleDeleteEvent = async (ev) => {
-    if (isFirebaseConfigured && db && !String(ev.id).startsWith('init-')) {
+  const handleAddEvent = (newEventData) => {
+    const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const saved = updateLocalEvents(
+      (current) => [...current, { id: localId, ...newEventData }],
+      'Agenda gagal disimpan di browser. Periksa ruang penyimpanan lokal.',
+    )
+    if (saved) showToast(`Agenda "${newEventData.title}" berhasil ditambahkan ke kalender`)
+  }
+
+  const handleDeleteEvent = (ev) => {
+    const saved = updateLocalEvents(
+      (current) => current.filter((item) => String(item.id) !== String(ev.id)),
+      'Agenda gagal dihapus dari penyimpanan browser.',
+    )
+    if (saved) showToast(`Agenda "${ev.title}" telah dihapus`)
+  }
+
+  const handleLogout = async () => {
+    if (user?.role === 'mahasiswa' && auth) {
       try {
-        await deleteDoc(doc(db, 'events', String(ev.id)))
-      } catch {}
+        await signOut(auth)
+      } catch (error) {
+        console.error('Firebase Authentication gagal mengeluarkan akun.', error)
+        showToast('Tidak dapat keluar dari akun Firebase. Coba lagi.')
+        return
+      }
     }
-    setEvents((prev) => prev.filter((item) => String(item.id) !== String(ev.id)))
-    showToast(`Agenda "${ev.title}" telah dihapus`)
+    setUser(null)
   }
 
   const handleCopyWhatsApp = async (ev, dateText) => {
@@ -351,13 +342,28 @@ export default function App() {
     }
   }
 
+  if (!authReady) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-canvas text-sm text-zinc-500 dark:bg-slate-950 dark:text-slate-400">
+        Memeriksa sesi akun...
+      </div>
+    )
+  }
+
   if (!user) {
     return (
       <LoginScreen
         onLogin={(u) => {
+          setAuthError('')
           setUser(u)
           setActiveTab('dashboard')
         }}
+        onGuest={() => {
+          setAuthError('')
+          setUser(GUEST_USER)
+          setActiveTab('calendar')
+        }}
+        initialError={authError}
         dark={dark}
         onToggleTheme={toggleTheme}
       />
@@ -370,7 +376,7 @@ export default function App() {
     <div className="min-h-screen bg-canvas text-zinc-900 dark:bg-slate-950 dark:text-slate-100">
       <Navbar
         user={user}
-        onLogout={() => setUser(null)}
+        onLogout={handleLogout}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         remindedCount={remindedIds.size}
@@ -379,11 +385,10 @@ export default function App() {
         searchRef={searchRef}
         dark={dark}
         onToggleTheme={toggleTheme}
-        cloudSynced={cloudSynced}
       />
 
       <main className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
-        {activeTab === 'dashboard' && (
+        {activeTab === 'dashboard' && user.role !== 'guest' && (
           <DashboardTab
             user={user}
             events={facultyScopedEvents}
@@ -392,7 +397,6 @@ export default function App() {
             onSendReminder={handleSendReminder}
             checklist={checklist}
             onToggleChecklist={handleToggleChecklist}
-            allRemindersStats={allRemindersStats}
             onSelectEvent={setSelectedEvent}
             onSwitchTab={setActiveTab}
             onOpenAdd={() => setAddModalOpen(true)}
@@ -412,6 +416,7 @@ export default function App() {
               view={view}
               onViewChange={setView}
               isAdmin={user.role === 'admin'}
+              isGuest={user.role === 'guest'}
               onOpenAdd={() => setAddModalOpen(true)}
               sentCount={remindedIds.size}
               onExportIcs={() => {
@@ -437,6 +442,7 @@ export default function App() {
                 events={visibleEvents}
                 flashDay={flashDay}
                 constrained={split}
+                isGuest={user.role === 'guest'}
                 remindedIds={remindedIds}
                 sendingEventId={sendingEventId}
                 onSendReminder={handleSendReminder}
@@ -446,7 +452,7 @@ export default function App() {
           </>
         )}
 
-        {activeTab === 'workspace' && (
+        {activeTab === 'workspace' && user.role !== 'guest' && (
           <WorkspaceTab
             user={user}
             events={facultyScopedEvents}
@@ -462,7 +468,7 @@ export default function App() {
 
         <footer className="flex flex-col gap-1 border-t border-line pt-5 text-xs text-zinc-500 dark:border-slate-800 dark:text-slate-500 sm:flex-row sm:justify-between">
           <span>Biro Administrasi Akademik — Universitas Klabat</span>
-          <span>Login aktif: {user.email}</span>
+          <span>{user.role === 'guest' ? 'Mode tamu · hanya melihat kalender pendaftaran' : `Login aktif: ${user.email}`}</span>
         </footer>
       </main>
 

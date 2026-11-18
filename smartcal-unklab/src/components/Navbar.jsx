@@ -1,8 +1,9 @@
 import {
   CalendarRange,
   ClipboardCheck,
-  Database,
+  HardDrive,
   LayoutDashboard,
+  LogIn,
   LogOut,
   Moon,
   Search,
@@ -23,7 +24,6 @@ export default function Navbar({
   searchRef,
   dark,
   onToggleTheme,
-  cloudSynced,
 }) {
   const initials = user.name
     .split(' ')
@@ -32,16 +32,18 @@ export default function Navbar({
     .join('')
     .toUpperCase()
 
-  const navTabs = [
+  const navTabs = user.role === 'guest'
+    ? [{ key: 'calendar', label: 'Kalender Pendaftaran', Icon: CalendarRange }]
+    : [
     { key: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
     { key: 'calendar', label: 'Kalender Akademik', Icon: CalendarRange },
     {
       key: 'workspace',
-      label: user.role === 'admin' ? 'Kelola Jadwal' : 'Pengingat & Syarat',
+      label: user.role === 'admin' ? 'Kelola Jadwal' : 'Atur Jadwal',
       Icon: user.role === 'admin' ? ShieldCheck : ClipboardCheck,
       badge: user.role === 'mahasiswa' && remindedCount > 0 ? remindedCount : null,
     },
-  ]
+    ]
 
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-canvas/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
@@ -89,14 +91,12 @@ export default function Navbar({
           })}
         </nav>
 
-        {cloudSynced && (
-          <span
-            title="Tersinkronisasi dengan Firebase Firestore"
-            className="hidden items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/50 dark:text-emerald-300 xl:inline-flex"
-          >
-            <Database className="size-2.5" /> Firestore Live
-          </span>
-        )}
+        <span
+          title="Agenda dan pengingat tersimpan hanya di browser ini"
+          className="hidden items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:border-sky-900/60 dark:bg-sky-950/50 dark:text-sky-300 xl:inline-flex"
+        >
+          <HardDrive className="size-2.5" /> Data Lokal
+        </span>
 
         <div className="ml-auto flex items-center gap-2">
           {activeTab === 'calendar' && (
@@ -133,7 +133,11 @@ export default function Navbar({
             <div className="hidden text-left sm:block">
               <p className="max-w-[120px] truncate text-xs font-medium leading-none">{user.name}</p>
               <p className="mt-0.5 max-w-[120px] truncate text-[10px] text-zinc-400 dark:text-slate-500">
-                {user.role === 'admin' ? 'Admin BAA' : user.faculty.replace('Fakultas ', '')}
+                {user.role === 'admin'
+                  ? 'Admin BAA'
+                  : user.role === 'guest'
+                    ? 'Mode Tamu'
+                    : 'Semua Fakultas'}
               </p>
             </div>
           </div>
@@ -141,11 +145,11 @@ export default function Navbar({
           <button
             type="button"
             onClick={onLogout}
-            title="Keluar"
+            title={user.role === 'guest' ? 'Masuk' : 'Keluar'}
             className="inline-flex h-8 cursor-pointer touch-manipulation items-center gap-1.5 rounded-md border border-line bg-white px-2.5 text-xs font-medium text-zinc-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-rose-900/60 dark:hover:bg-rose-950/40 dark:hover:text-rose-300"
           >
-            <LogOut className="size-3.5" />
-            <span className="hidden sm:inline">Keluar</span>
+            {user.role === 'guest' ? <LogIn className="size-3.5" /> : <LogOut className="size-3.5" />}
+            <span className="hidden sm:inline">{user.role === 'guest' ? 'Masuk' : 'Keluar'}</span>
           </button>
         </div>
       </div>

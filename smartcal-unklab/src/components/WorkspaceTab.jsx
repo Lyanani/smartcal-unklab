@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Check, Plus, Trash2 } from 'lucide-react'
+import { AlertTriangle, Check, Plus, Trash2 } from 'lucide-react'
 import { CATEGORIES } from '../data/calendarData'
-import { cn, getRelativeDayLabel } from '../utils/calendarUtils'
+import { cn, getEventConflicts, getRelativeDayLabel } from '../utils/calendarUtils'
+import ScheduleAssistant from '../../ai/ScheduleAssistant.jsx'
 
 export default function WorkspaceTab({
   user,
@@ -15,13 +16,18 @@ export default function WorkspaceTab({
   onOpenAddModal,
 }) {
   const isAdmin = user.role === 'admin'
+  const ownerKey = user.email || 'guest'
   const [pTitle, setPTitle] = useState('')
   const [pDay, setPDay] = useState(19)
   const [pTime, setPTime] = useState('14.00 WITA')
   const [pLocation, setPLocation] = useState('Google Classroom / Lab')
 
   const remindedEvents = events.filter((e) => remindedIds.has(String(e.id))).sort((a, b) => a.start - b.start)
-  const personalEvents = events.filter((e) => e.isPersonal && e.ownerEmail === user.email)
+  const personalEvents = events.filter((e) => e.isPersonal && e.ownerEmail === ownerKey)
+  const manualConflicts = getEventConflicts(
+    { start: Number(pDay), end: Number(pDay), time: pTime, durationMinutes: 60 },
+    events,
+  )
 
   const handlePersonalSubmit = async (e) => {
     e.preventDefault()
@@ -33,11 +39,14 @@ export default function WorkspaceTab({
       category: 'pribadi',
       faculty: user.faculty,
       isPersonal: true,
-      ownerEmail: user.email,
+      ownerEmail: ownerKey,
       title: pTitle.trim(),
       time: pTime.trim() || '12.00 WITA',
+      durationMinutes: 60,
       location: pLocation.trim() || 'Mandiri / Online',
-      description: `Tugas / agenda pribadi milik ${user.name} (${user.email}).`,
+      description: user.email
+        ? `Tugas / agenda pribadi milik ${user.name} (${user.email}).`
+        : `Tugas / agenda pribadi milik ${user.name} di browser ini.`,
     })
     setPTitle('')
   }
@@ -50,7 +59,7 @@ export default function WorkspaceTab({
           <div>
             <h1 className="text-lg font-semibold tracking-tight">Kelola Jadwal Akademik Semester Ganjil</h1>
             <p className="text-xs text-zinc-500 dark:text-slate-400">
-              Tambah atau hapus agenda resmi kampus. Perubahan langsung tersinkronisasi ke seluruh mahasiswa.
+              Tambah atau hapus agenda kalender lokal di browser ini.
             </p>
           </div>
           <button
@@ -131,7 +140,9 @@ export default function WorkspaceTab({
             <div>
               <h2 className="text-base font-semibold tracking-tight">Riwayat Pengingat Gmail Aktif</h2>
               <p className="text-xs text-zinc-500 dark:text-slate-400">
-                Tujuan pengiriman: <strong>{user.email}</strong>
+                {user.role === 'guest'
+                  ? 'Mode tamu: masuk untuk mengirim pengingat ke Gmail.'
+                  : <>Tujuan pengiriman: <strong>{user.email}</strong></>}
               </p>
             </div>
             <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
@@ -233,6 +244,18 @@ export default function WorkspaceTab({
               Simpan ke Kalender Pribadi
             </button>
           </form>
+
+          {manualConflicts.length > 0 && (
+            <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+              <span>
+                Waktu ini bertabrakan dengan {manualConflicts.map((event) => `“${event.title}”`).join(', ')}.
+                Kamu tetap bisa menyimpan setelah memeriksa jadwal.
+              </span>
+            </p>
+          )}
+
+          <ScheduleAssistant user={user} events={events} onAddPersonalEvent={onAddPersonalEvent} />
 
           {personalEvents.length > 0 && (
             <div className="mt-4 border-t border-line pt-3 dark:border-slate-800">

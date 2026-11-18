@@ -6,6 +6,56 @@ export const weekdayOf = (day) => DAY_NAMES[(day - 1) % 7]
 
 export const eventsOnDay = (list, day) => list.filter((e) => day >= e.start && day <= e.end)
 
+function getEventInterval(event) {
+  if (/seharian|sehari penuh/i.test(event.time || '')) {
+    return { start: 0, end: 24 * 60 }
+  }
+
+  const time = String(event.time || '')
+  const match = time.match(/\b([01]?\d|2[0-3])[:.]([0-5]\d)\b/)
+  const hourOnlyMatch = match ? null : time.match(/\b([01]?\d|2[0-3])\s*(?:WITA|WIB|WIT)\b/i)
+  if (!match && !hourOnlyMatch) return null
+
+  const start = match
+    ? Number(match[1]) * 60 + Number(match[2])
+    : Number(hourOnlyMatch[1]) * 60
+  const duration = Number(event.durationMinutes) > 0 ? Number(event.durationMinutes) : 60
+  return { start, end: Math.min(24 * 60, start + duration) }
+}
+
+export function getEventConflicts(event, events) {
+  const interval = getEventInterval(event)
+  if (!interval) return []
+
+  return events.filter((other) => {
+    if (event.id && String(event.id) === String(other.id)) return false
+    if (event.start > other.end || event.end < other.start) return false
+
+    const otherInterval = getEventInterval(other)
+    return otherInterval && interval.start < otherInterval.end && otherInterval.start < interval.end
+  })
+}
+
+export function findAvailableTime(day, durationMinutes, events) {
+  const duration = Number(durationMinutes) > 0 ? Number(durationMinutes) : 60
+  for (let start = 8 * 60; start + duration <= 22 * 60; start += 30) {
+    const time = `${String(Math.floor(start / 60)).padStart(2, '0')}:${String(start % 60).padStart(2, '0')}`
+    const candidate = { start: day, end: day, time, durationMinutes: duration }
+    if (getEventConflicts(candidate, events).length === 0) return start
+  }
+  return null
+}
+
+export function formatTimeInput(minutes) {
+  const value = Number(minutes) || 0
+  return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`
+}
+
+export function parseTimeInput(time) {
+  const match = String(time || '').match(/^(?:([01]\d|2[0-3])):([0-5]\d)$/)
+  return match ? Number(match[1]) * 60 + Number(match[2]) : null
+}
+
 export function formatEventDateText(event) {
   return event.end > event.start
     ? `${event.start} – ${event.end} November 2026`

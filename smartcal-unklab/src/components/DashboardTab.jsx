@@ -23,13 +23,13 @@ export default function DashboardTab({
   onSendReminder,
   checklist,
   onToggleChecklist,
-  allRemindersStats,
   onSelectEvent,
   onSwitchTab,
   onOpenAdd,
   onExportIcs,
 }) {
   const isAdmin = user.role === 'admin'
+  const isGuest = user.role === 'guest'
   const upcomingEvents = [...events].filter((e) => e.end >= TODAY).sort((a, b) => a.start - b.start)
   const completedChecklist = checklist.filter((c) => c.done).length
   const readinessPct = checklist.length ? Math.round((completedChecklist / checklist.length) * 100) : 0
@@ -64,11 +64,11 @@ export default function DashboardTab({
     return events
       .map((ev) => ({
         ...ev,
-        reminderCount: allRemindersStats.get(String(ev.id)) || (remindedIds.has(String(ev.id)) ? 1 : 0),
+        reminderCount: remindedIds.has(String(ev.id)) ? 1 : 0,
       }))
       .sort((a, b) => b.reminderCount - a.reminderCount)
       .slice(0, 5)
-  }, [events, allRemindersStats, remindedIds])
+  }, [events, remindedIds])
 
   return (
     <div className="flex flex-col gap-6">
@@ -78,7 +78,7 @@ export default function DashboardTab({
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Ringkasan statistik">
         <div className="rounded-xl border border-line bg-white p-5 dark:border-slate-800 dark:bg-slate-900/70">
           <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-slate-400">
-            <span>{isAdmin ? 'Total Jadwal Semester' : 'Agenda Fakultas Aktif'}</span>
+            <span>{isAdmin ? 'Total Jadwal Semester' : 'Agenda Semua Fakultas'}</span>
             <Calendar className="size-4 text-sky-500" />
           </div>
           <p className="mt-2 text-2xl font-semibold tabular-nums">{events.length} Agenda</p>
@@ -89,17 +89,18 @@ export default function DashboardTab({
 
         <div className="rounded-xl border border-line bg-white p-5 dark:border-slate-800 dark:bg-slate-900/70">
           <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-slate-400">
-            <span>{isAdmin ? 'Total Pengingat Terkirim' : 'Terkirim ke Gmail Saya'}</span>
+            <span>{isAdmin ? 'Pengingat Lokal Terkirim' : isGuest ? 'Pengingat Gmail' : 'Terkirim ke Gmail Saya'}</span>
             <Mail className="size-4 text-emerald-500" />
           </div>
           <p className="mt-2 text-2xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
-            {isAdmin
-              ? Math.max(remindedIds.size, [...allRemindersStats.values()].reduce((a, b) => a + b, 0))
-              : remindedIds.size}{' '}
-            Jadwal
+            {isGuest ? '—' : `${remindedIds.size} Jadwal`}
           </p>
           <p className="mt-1 text-xs text-zinc-400 dark:text-slate-500">
-            Tujuan: {user.email}
+            {isAdmin
+              ? 'Akun ini di browser sekarang'
+              : isGuest
+                ? 'Masuk untuk mengirim pengingat ke Gmail'
+                : `Tujuan: ${user.email}`}
           </p>
         </div>
 
@@ -167,7 +168,9 @@ export default function DashboardTab({
             <div>
               <h2 className="text-base font-semibold tracking-tight">Agenda Terdekat</h2>
               <p className="text-xs text-zinc-500 dark:text-slate-400">
-                Tap kartu untuk detail atau langsung kirim pengingat Gmail
+                {isGuest
+                  ? 'Pilih agenda untuk melihat detail dan tautan kalender'
+                  : 'Tap kartu untuk detail atau langsung kirim pengingat Gmail'}
               </p>
             </div>
             <button
@@ -223,6 +226,7 @@ export default function DashboardTab({
                       event={ev}
                       isSent={isSent}
                       isSending={isSending}
+                      isGuest={isGuest}
                       onSend={onSendReminder}
                     />
                   </div>
@@ -237,9 +241,9 @@ export default function DashboardTab({
           <section className="flex flex-col gap-5 rounded-xl border border-line bg-white p-5 dark:border-slate-800 dark:bg-slate-900/70">
             <div className="flex items-center justify-between border-b border-line pb-3.5 dark:border-slate-800">
               <div>
-                <h2 className="text-base font-semibold tracking-tight">Analitik Jadwal & Pengingat BAA</h2>
+                <h2 className="text-base font-semibold tracking-tight">Analitik Agenda & Pengingat Lokal</h2>
                 <p className="text-xs text-zinc-500 dark:text-slate-400">
-                  Proporsi kategori dan agenda paling banyak dipantau mahasiswa
+                  Kategori agenda dan status pengingat akun ini di browser sekarang
                 </p>
               </div>
               <button
@@ -270,7 +274,7 @@ export default function DashboardTab({
 
             <div className="border-t border-line pt-3 dark:border-slate-800">
               <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-zinc-400">
-                Agenda dengan Aktivasi Gmail Tertinggi
+                Agenda dengan Status Pengingat Lokal
               </p>
               <div className="flex flex-col gap-2">
                 {topRemindedEvents.map((ev) => (
@@ -280,7 +284,7 @@ export default function DashboardTab({
                   >
                     <span className="truncate pr-2 font-medium">{ev.title}</span>
                     <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 font-semibold tabular-nums text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                      {ev.reminderCount} mahasiswa
+                      {ev.reminderCount} status
                     </span>
                   </div>
                 ))}
@@ -339,7 +343,7 @@ export default function DashboardTab({
               onClick={() => onSwitchTab('workspace')}
               className="mt-4 inline-flex cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border border-line py-2.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
-              Buka Pusat Pengingat & Tugas Pribadi
+              Buka Atur Jadwal
               <ArrowRight className="size-3.5" />
             </button>
           </section>

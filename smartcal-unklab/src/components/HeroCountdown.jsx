@@ -34,7 +34,11 @@ export default function HeroCountdown({ user }) {
               <span className="size-1.5 rounded-full bg-sky-500" /> Agenda Krusial Terdekat
             </span>
             <span>
-              {user.role === 'admin' ? 'Mode Pengelola Jadwal BAA' : `Filter Aktif: ${user.faculty}`}
+              {user.role === 'admin'
+                ? 'Mode Pengelola Jadwal BAA'
+                : user.role === 'guest'
+                  ? 'Mode Tamu · Semua Fakultas'
+                  : 'Jadwal Semua Fakultas'}
             </span>
           </div>
 

@@ -22,7 +22,7 @@ const VIEWS = [
   { key: 'list', label: 'Daftar Timeline', Icon: List },
 ]
 
-export default function FilterBar({ events, active, onToggle, view, onViewChange, isAdmin, onOpenAdd, sentCount, onExportIcs }) {
+export default function FilterBar({ events, active, onToggle, view, onViewChange, isAdmin, isGuest, onOpenAdd, sentCount, onExportIcs }) {
   const all = active.size === CATEGORY_KEYS.length
 
   return (
@@ -52,14 +52,14 @@ export default function FilterBar({ events, active, onToggle, view, onViewChange
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {sentCount > 0 && (
+        {!isGuest && sentCount > 0 && (
           <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/50 dark:text-emerald-300">
             <CheckCircle2 className="size-3.5" />
             {sentCount} Terkirim ke Gmail
           </span>
         )}
 
-        <button
+        {!isGuest && <button
           type="button"
           onClick={onExportIcs}
           title="Unduh semua jadwal ke aplikasi Kalender HP/Laptop"
@@ -67,7 +67,7 @@ export default function FilterBar({ events, active, onToggle, view, onViewChange
         >
           <Download className="size-3.5" />
           Export .ics
-        </button>
+        </button>}
 
         <div
           className="inline-flex rounded-md border border-line bg-white p-0.5 text-xs dark:border-slate-800 dark:bg-slate-900"

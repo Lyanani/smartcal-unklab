@@ -1,7 +1,7 @@
 import { Bell, CheckCircle2, Mail } from 'lucide-react'
 import { cn } from '../utils/calendarUtils'
 
-export default function QuickRemindButton({ event, isSent, isSending, onSend }) {
+export default function QuickRemindButton({ event, isSent, isSending, isGuest = false, onSend }) {
   return (
     <button
       type="button"
@@ -30,7 +30,7 @@ export default function QuickRemindButton({ event, isSent, isSending, onSend }) 
       ) : (
         <>
           <Mail className="size-3.5" />
-          <span>Ingatkan Gmail</span>
+          <span>{isGuest ? 'Masuk untuk Gmail' : 'Ingatkan Gmail'}</span>
         </>
       )}
     </button>
