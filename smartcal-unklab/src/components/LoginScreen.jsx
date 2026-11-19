@@ -1,40 +1,108 @@
 import { useState } from 'react'
+import { signInWithEmailAndPassword } from 'firebase/auth'
 import {
   ArrowRight,
   CalendarRange,
   GraduationCap,
+  KeyRound,
   Mail,
   Moon,
   ShieldCheck,
   Sun,
 } from 'lucide-react'
+import { aiAuth } from '../../ai/client.js'
 import { cn } from '../utils/calendarUtils'
+
+const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAILS || '')
+  .split(',')
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean)
+
+const ADMIN_PASSWORD = (import.meta.env.VITE_ADMIN_PASSWORD || '').trim()
+
+const mapFirebaseAuthError = (code) => {
+  if (code === 'auth/invalid-credential' || code === 'auth/user-not-found' || code === 'auth/wrong-password') {
+    return 'Email atau kata sandi Firebase tidak cocok dengan akun yang terdaftar.'
+  }
+  if (code === 'auth/too-many-requests') {
+    return 'Terlalu banyak percobaan login. Tunggu sebentar lalu coba lagi.'
+  }
+  if (code === 'auth/network-request-failed') {
+    return 'Gagal terhubung ke server Firebase. Periksa koneksi internet kamu.'
+  }
+  return 'Gagal memverifikasi akun Firebase. Periksa kembali email dan kata sandi.'
+}
 
 export default function LoginScreen({ onLogin, onBack, dark, onToggleTheme }) {
   const [role, setRole] = useState('mahasiswa')
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [faculty, setFaculty] = useState('Fakultas Ilmu Komputer (FILKOM)')
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     const trimmed = email.trim()
+    const passTrimmed = password.trim()
+
     if (!trimmed || !trimmed.includes('@')) {
       setError('Masukkan alamat Gmail aktif untuk menerima pengingat jadwal.')
       return
     }
+
+    if (!passTrimmed) {
+      setError(
+        role === 'admin'
+          ? 'Masukkan kata sandi Admin terlebih dahulu.'
+          : 'Masukkan kata sandi atau token Firebase terlebih dahulu.',
+      )
+      return
+    }
+
     const namePart = trimmed.split('@')[0].replace(/[._]/g, ' ')
     const displayName = namePart
       .split(' ')
       .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ''))
       .join(' ')
 
-    onLogin({
-      role,
-      email: trimmed,
-      name: displayName || (role === 'admin' ? 'Admin' : 'Mahasiswa UNKLAB'),
-      faculty: role === 'admin' ? 'Admin' : faculty,
-    })
+    if (role === 'admin') {
+      if (ADMIN_EMAILS.length > 0 && !ADMIN_EMAILS.includes(trimmed.toLowerCase())) {
+        setError('Email tidak terdaftar sebagai Admin di VITE_ADMIN_EMAILS.')
+        return
+      }
+      if (ADMIN_PASSWORD && passTrimmed !== ADMIN_PASSWORD) {
+        setError('Kata sandi Admin tidak sesuai dengan VITE_ADMIN_PASSWORD.')
+        return
+      }
+      onLogin({
+        role: 'admin',
+        email: trimmed,
+        name: displayName || 'Admin',
+        faculty: 'Admin',
+      })
+      return
+    }
+
+    setSubmitting(true)
+    setError('')
+
+    try {
+      const credential = await signInWithEmailAndPassword(aiAuth, trimmed, passTrimmed)
+      const verifiedEmail = credential.user?.email || trimmed
+
+      onLogin({
+        role: 'mahasiswa',
+        email: verifiedEmail,
+        uid: credential.user?.uid,
+        name: displayName || 'Mahasiswa UNKLAB',
+        faculty,
+      })
+    } catch (err) {
+      setError(mapFirebaseAuthError(err?.code))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -71,7 +139,10 @@ export default function LoginScreen({ onLogin, onBack, dark, onToggleTheme }) {
             <div className="grid grid-cols-2 gap-2 rounded-lg border border-line bg-canvas p-1 dark:border-slate-800 dark:bg-slate-950">
               <button
                 type="button"
-                onClick={() => setRole('mahasiswa')}
+                onClick={() => {
+                  setRole('mahasiswa')
+                  setError('')
+                }}
                 className={cn(
                   'flex cursor-pointer touch-manipulation items-center justify-center gap-2 rounded-md py-2 text-xs font-medium transition',
                   role === 'mahasiswa'
@@ -84,7 +155,10 @@ export default function LoginScreen({ onLogin, onBack, dark, onToggleTheme }) {
               </button>
               <button
                 type="button"
-                onClick={() => setRole('admin')}
+                onClick={() => {
+                  setRole('admin')
+                  setError('')
+                }}
                 className={cn(
                   'flex cursor-pointer touch-manipulation items-center justify-center gap-2 rounded-md py-2 text-xs font-medium transition',
                   role === 'admin'
@@ -120,6 +194,28 @@ export default function LoginScreen({ onLogin, onBack, dark, onToggleTheme }) {
             </div>
           </div>
 
+          <div>
+            <label htmlFor="firebase-token-input" className="mb-1.5 block text-xs font-medium text-zinc-600 dark:text-slate-400">
+              {role === 'admin' ? 'Kata Sandi Admin' : 'Token / Kata Sandi Firebase'}
+            </label>
+            <div className="relative">
+              <KeyRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+              <input
+                id="firebase-token-input"
+                name="smartcal-firebase-token"
+                type="password"
+                autoComplete="off"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  setError('')
+                }}
+                placeholder={role === 'admin' ? 'Masukkan kata sandi Admin' : 'Masukkan token / kata sandi Firebase'}
+                className="h-10 w-full rounded-lg border border-line bg-white pl-9 pr-3 text-sm placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:focus:border-slate-500"
+              />
+            </div>
+          </div>
+
           {role === 'mahasiswa' && (
             <div>
               <label htmlFor="faculty-select" className="mb-1.5 block text-xs font-medium text-zinc-600 dark:text-slate-400">
@@ -146,9 +242,10 @@ export default function LoginScreen({ onLogin, onBack, dark, onToggleTheme }) {
 
           <button
             type="submit"
-            className="mt-1 inline-flex h-11 cursor-pointer touch-manipulation items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white transition hover:bg-zinc-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+            disabled={submitting}
+            className="mt-1 inline-flex h-11 cursor-pointer touch-manipulation items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
           >
-            Masuk ke Portal Akademik
+            {submitting ? 'Memverifikasi Firebase...' : 'Masuk ke Portal Akademik'}
             <ArrowRight className="size-4" />
           </button>
         </form>

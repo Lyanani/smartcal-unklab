@@ -13,5 +13,5 @@ const firebaseConfig = {
 
 // 2. Inisialisasi otomatis (jangan diubah agar terhubung ke App.jsx)
 export const isFirebaseConfigured = !firebaseConfig.projectId.startsWith('ISI_')
-const app = isFirebaseConfigured ? initializeApp(firebaseConfig) : null
+export const app = isFirebaseConfigured ? initializeApp(firebaseConfig) : null
 export const db = app ? getFirestore(app) : null

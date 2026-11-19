@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { CATEGORIES, MONTH_NAMES } from '../data/calendarData'
 import { cn, formatEventDateText, getRelativeDayLabel } from '../utils/calendarUtils'
+import ScheduleAssistant from '../../ai/ScheduleAssistant.jsx'
 
 const toLocalDateInputString = (d) => {
   const y = d.getFullYear()
@@ -38,6 +39,7 @@ export default function WorkspaceTab({
   onSelectEvent,
   customReminders = [],
   onAddCustomReminder,
+  onAddPersonalEvent,
   onDeleteCustomReminder,
   onRemoveAcademicReminder,
   onSendReminder,
@@ -388,6 +390,15 @@ export default function WorkspaceTab({
               </div>
             </form>
           )}
+        </section>
+
+        {/* Asisten Penyusun Jadwal AI */}
+        <section className="rounded-xl border border-line bg-white p-4.5 dark:border-slate-800 dark:bg-slate-900/70 [&>div]:mt-0 [&>div]:border-t-0 [&>div]:pt-0">
+          <ScheduleAssistant
+            user={user}
+            events={events}
+            onAddPersonalEvent={onAddPersonalEvent || onAddCustomReminder}
+          />
         </section>
 
         {/* Unified Reminder Cards List */}
