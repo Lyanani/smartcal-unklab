@@ -33,7 +33,7 @@ export default function Navbar({
     .toUpperCase()
 
   const navTabs = user.role === 'guest'
-    ? [{ key: 'calendar', label: 'Kalender Pendaftaran', Icon: CalendarRange }]
+    ? [{ key: 'calendar', label: 'Kalender', Icon: CalendarRange }]
     : [
     { key: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
     { key: 'calendar', label: 'Kalender Akademik', Icon: CalendarRange },

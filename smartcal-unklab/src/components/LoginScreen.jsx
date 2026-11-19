@@ -221,7 +221,7 @@ export default function LoginScreen({ onLogin, onGuest, initialError = '', dark,
             onClick={onGuest}
             className="inline-flex h-10 cursor-pointer touch-manipulation items-center justify-center rounded-lg border border-line bg-white px-4 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
           >
-            Lihat Kalender Pendaftaran
+            Lihat Kalender
           </button>
         </form>
 

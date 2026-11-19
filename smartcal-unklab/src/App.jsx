@@ -468,7 +468,7 @@ export default function App() {
 
         <footer className="flex flex-col gap-1 border-t border-line pt-5 text-xs text-zinc-500 dark:border-slate-800 dark:text-slate-500 sm:flex-row sm:justify-between">
           <span>Biro Administrasi Akademik — Universitas Klabat</span>
-          <span>{user.role === 'guest' ? 'Mode tamu · hanya melihat kalender pendaftaran' : `Login aktif: ${user.email}`}</span>
+          <span>{user.role === 'guest' ? 'Mode tamu · hanya melihat kalender' : `Login aktif: ${user.email}`}</span>
         </footer>
       </main>
 
