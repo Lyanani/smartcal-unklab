@@ -1,56 +1,60 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https')
 
-const MODEL = 'gemini-3.8-flash'
-const FALLBACK_MODEL = 'gemini-3.6-flash'
+const MODEL = 'openrouter/free'
 const REQUEST_TIMEOUT_MS = 20_000
-const retryableStatuses = new Set([408, 429, 500, 502, 503, 504])
+const retryableStatuses = new Set([408, 500, 502, 503, 504])
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
 
 const responseSchema = {
-  type: 'OBJECT',
+  type: 'object',
   properties: {
-    unsupportedMonth: { type: 'BOOLEAN' },
+    unsupportedMonth: { type: 'boolean' },
     tasks: {
-      type: 'ARRAY',
+      type: 'array',
       items: {
-        type: 'OBJECT',
+        type: 'object',
         properties: {
-          day: { type: 'INTEGER' },
-          title: { type: 'STRING' },
-          requestedTime: { type: 'STRING' },
-          durationMinutes: { type: 'INTEGER' },
+          day: { type: 'integer' },
+          title: { type: 'string' },
+          requestedTime: { type: 'string' },
+          durationMinutes: { type: 'integer' },
         },
         required: ['day', 'title', 'requestedTime', 'durationMinutes'],
+        additionalProperties: false,
       },
     },
   },
   required: ['unsupportedMonth', 'tasks'],
+  additionalProperties: false,
 }
 
-async function generateWithGemini(model, apiKey, systemInstruction, prompt) {
-  const response = await fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
-      },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: systemInstruction }],
-        },
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema,
-          temperature: 0.1,
-          maxOutputTokens: 2048,
-        },
-      }),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+async function generateWithOpenRouter(apiKey, systemInstruction, prompt) {
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + apiKey,
+      'Content-Type': 'application/json',
+      'X-Title': 'SmartCal UNKLAB',
     },
-  )
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [
+        { role: 'system', content: systemInstruction },
+        { role: 'user', content: prompt },
+      ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'schedule_request',
+          strict: true,
+          schema: responseSchema,
+        },
+      },
+      temperature: 0.1,
+      max_tokens: 2048,
+    }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  })
 
   const responseBody = await response.text()
   let payload
@@ -62,14 +66,14 @@ async function generateWithGemini(model, apiKey, systemInstruction, prompt) {
 
   if (!response.ok) {
     const error = new Error(
-      payload?.error?.message || ('Gemini HTTP ' + response.status + ' ' + response.statusText),
+      payload?.error?.message || ('OpenRouter HTTP ' + response.status + ' ' + response.statusText),
     )
     error.status = response.status
     throw error
   }
 
   if (!payload) {
-    throw new Error('Gemini returned a successful response that was not valid JSON.')
+    throw new Error('OpenRouter returned a successful response that was not valid JSON.')
   }
 
   return payload
@@ -92,8 +96,8 @@ exports.parseScheduleRequest = onCall(
     if (!Number.isInteger(defaultDay) || defaultDay < 1 || defaultDay > 30) {
       throw new HttpsError('invalid-argument', 'Tanggal default harus berada pada 1–30 November 2026.')
     }
-    if (!process.env.GEMINI_API_KEY) {
-      throw new HttpsError('failed-precondition', 'GEMINI_API_KEY belum diatur pada ai/functions/.env.')
+    if (!process.env.OPENROUTER_API_KEY) {
+      throw new HttpsError('failed-precondition', 'OPENROUTER_API_KEY belum diatur pada ai/functions/.env.')
     }
 
     const systemInstruction = [
@@ -112,69 +116,75 @@ exports.parseScheduleRequest = onCall(
     ].join('\n')
     const prompt = 'Permintaan jadwal pengguna:\n' + instructions.trim()
 
-    const modelAttempts = [
-      { model: MODEL, attempts: 2 },
-      { model: FALLBACK_MODEL, attempts: 1 },
-    ]
     let payload
     let lastError
 
-    for (const modelConfig of modelAttempts) {
-      for (let attempt = 0; attempt < modelConfig.attempts; attempt += 1) {
-        try {
-          payload = await generateWithGemini(
-            modelConfig.model,
-            process.env.GEMINI_API_KEY,
-            systemInstruction,
-            prompt,
-          )
-          lastError = null
-          break
-        } catch (error) {
-          lastError = error
-          const status = Number.isInteger(error.status) ? error.status : null
-          const retryable = status === null || retryableStatuses.has(status)
-          console.warn('Gemini attempt failed', {
-            model: modelConfig.model,
-            status,
-            message: String(error.message || error).slice(0, 300),
-          })
-
-          if (!retryable) break
-
-          const hasAnotherAttempt =
-            attempt + 1 < modelConfig.attempts || modelConfig !== modelAttempts[modelAttempts.length - 1]
-          if (hasAnotherAttempt) {
-            await sleep(attempt === 0 ? 1000 : 2000)
-          }
-        }
-      }
-
-      if (payload || (lastError && !retryableStatuses.has(lastError.status) && lastError.status !== undefined)) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        payload = await generateWithOpenRouter(
+          process.env.OPENROUTER_API_KEY,
+          systemInstruction,
+          prompt,
+        )
+        lastError = null
         break
+      } catch (error) {
+        lastError = error
+        const status = Number.isInteger(error.status) ? error.status : null
+        console.warn('OpenRouter attempt failed', {
+          model: MODEL,
+          status,
+          message: String(error.message || error).slice(0, 300),
+          causeCode: error.cause?.code || null,
+          causeMessage: String(error.cause?.message || '').slice(0, 300),
+        })
+
+        if (status === 429) {
+          throw new HttpsError(
+            'resource-exhausted',
+            'Batas permintaan gratis OpenRouter tercapai. Coba lagi setelah batasnya direset.',
+          )
+        }
+        if (status === 401 || status === 403) {
+          throw new HttpsError(
+            'failed-precondition',
+            'OpenRouter menolak API key. Periksa OPENROUTER_API_KEY di ai/functions/.env.',
+          )
+        }
+        if (status === 402) {
+          throw new HttpsError(
+            'failed-precondition',
+            'Permintaan ditolak karena kredit tidak tersedia. Pastikan model yang digunakan gratis.',
+          )
+        }
+
+        const retryable = status === null || retryableStatuses.has(status)
+        if (!retryable || attempt === 1) break
+        await sleep(1500)
       }
     }
 
     if (!payload) {
-      console.error('Gemini unavailable after retries', {
+      console.error('OpenRouter unavailable after retries', {
         status: lastError?.status || null,
         message: String(lastError?.message || lastError || 'Unknown error').slice(0, 300),
       })
       throw new HttpsError(
         'unavailable',
-        'Gemini belum tersedia setelah beberapa percobaan. Tunggu sebentar lalu coba lagi.',
+        'Model gratis OpenRouter belum tersedia. Tunggu sebentar lalu coba lagi.',
       )
     }
 
-    const responseText = payload.candidates?.[0]?.content?.parts
-      ?.map((part) => part.text || '')
-      .join('')
+    const content = payload.choices?.[0]?.message?.content
+    const responseText = Array.isArray(content)
+      ? content.map((part) => part.text || '').join('')
+      : content
     let parsed
     try {
       parsed = JSON.parse(responseText || '')
     } catch {
-      console.error('Gemini returned invalid schedule JSON')
-      throw new HttpsError('internal', 'Gemini mengembalikan format jadwal yang tidak valid.')
+      console.error('OpenRouter returned invalid schedule JSON')
+      throw new HttpsError('internal', 'Model mengembalikan format jadwal yang tidak valid.')
     }
 
     if (parsed.unsupportedMonth) {
@@ -198,7 +208,7 @@ exports.parseScheduleRequest = onCall(
         task.durationMinutes > 720 ||
         (requestedTime !== '' && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(requestedTime))
       ) {
-        throw new HttpsError('invalid-argument', 'Gemini mengembalikan detail kegiatan yang tidak valid.')
+        throw new HttpsError('invalid-argument', 'Model mengembalikan detail kegiatan yang tidak valid.')
       }
 
       return {

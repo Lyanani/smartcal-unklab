@@ -37,18 +37,18 @@ export default function ScheduleAssistant({ user, events, onAddPersonalEvent }) 
         throw new Error('Tambahkan VITE_FIREBASE_APPCHECK_SITE_KEY ke .env.local untuk mengaktifkan App Check.')
       }
 
-      const callGemini = httpsCallable(functions, 'parseScheduleRequest', { timeout: 80_000 })
-      const response = await callGemini({ instructions: prompt, defaultDay: Number(defaultDay) })
+      const callScheduleAssistant = httpsCallable(functions, 'parseScheduleRequest', { timeout: 80_000 })
+      const response = await callScheduleAssistant({ instructions: prompt, defaultDay: Number(defaultDay) })
       const requests = response.data?.tasks
       if (!Array.isArray(requests) || requests.length === 0) {
-        throw new Error('Gemini tidak menemukan kegiatan pada permintaan tersebut.')
+        throw new Error('AI tidak menemukan kegiatan pada permintaan tersebut.')
       }
 
       const plannedEvents = []
       const nextDrafts = requests.map((request, index) => {
         let timeMinutes = request.requestedTime ? parseTimeInput(request.requestedTime) : null
         if (request.requestedTime && timeMinutes === null) {
-          throw new Error(`Jam "${request.requestedTime}" dari Gemini tidak valid.`)
+          throw new Error(`Jam "${request.requestedTime}" dari AI tidak valid.`)
         }
 
         let noAvailableTime = false
@@ -71,7 +71,7 @@ export default function ScheduleAssistant({ user, events, onAddPersonalEvent }) 
       const message =
         import.meta.env.DEV && error.code === 'functions/internal'
           ? `Functions Emulator gagal memproses permintaan. Pastikan emulator berjalan di 127.0.0.1:5001 dan memakai project ID yang sama. Detail: ${error.message}`
-          : error.message || 'Periksa konfigurasi Firebase dan Gemini.'
+          : error.message || 'Periksa konfigurasi Firebase dan penyedia AI.'
       setMessage(`Gagal menyusun jadwal: ${message}`)
     } finally {
       setGenerating(false)
@@ -115,8 +115,8 @@ export default function ScheduleAssistant({ user, events, onAddPersonalEvent }) 
         <h3 className="text-sm font-semibold">Asisten Penyusun Jadwal</h3>
       </div>
       <p className="mt-1 text-xs text-zinc-500 dark:text-slate-400">
-        Gemini memahami permintaanmu; sistem memilih jam kosong dan memeriksa bentrok dengan agenda kampus serta
-        jadwal pribadimu. Hanya teks permintaan yang dikirim ke Gemini.
+        AI memahami permintaanmu; sistem memilih jam kosong dan memeriksa bentrok dengan agenda kampus serta
+        jadwal pribadimu. Hanya teks permintaan yang dikirim ke penyedia AI.
       </p>
       <textarea
         rows={3}
@@ -144,7 +144,7 @@ export default function ScheduleAssistant({ user, events, onAddPersonalEvent }) 
           className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 text-xs font-medium text-violet-800 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-violet-900/60 dark:bg-violet-950/40 dark:text-violet-200"
         >
           <Sparkles className="size-3.5" />
-          {generating ? 'Meminta Gemini...' : 'Susun jadwal'}
+        {generating ? 'Menyusun jadwal...' : 'Susun jadwal'}
         </button>
       </div>
       <p className="mt-2 text-[11px] text-zinc-400 dark:text-slate-500">
