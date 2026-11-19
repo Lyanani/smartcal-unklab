@@ -18,8 +18,6 @@ const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAILS || '')
   .map((email) => email.trim().toLowerCase())
   .filter(Boolean)
 
-const ADMIN_PASSWORD = (import.meta.env.VITE_ADMIN_PASSWORD || '').trim()
-
 const mapFirebaseAuthError = (code) => {
   if (code === 'auth/invalid-credential' || code === 'auth/user-not-found' || code === 'auth/wrong-password') {
     return 'Email atau kata sandi Firebase tidak cocok dengan akun yang terdaftar.'
@@ -44,18 +42,12 @@ export default function LoginScreen({ onLogin, onBack, dark, onToggleTheme }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     const trimmed = email.trim()
-    const passTrimmed = password.trim()
 
     if (!trimmed || !trimmed.includes('@')) {
-      setError('Masukkan alamat Gmail aktif untuk menerima pengingat jadwal.')
-      return
-    }
-
-    if (!passTrimmed) {
       setError(
         role === 'admin'
-          ? 'Masukkan kata sandi Admin terlebih dahulu.'
-          : 'Masukkan kata sandi atau token Firebase terlebih dahulu.',
+          ? 'Masukkan email akun admin yang terdaftar pada VITE_ADMIN_EMAILS.'
+          : 'Masukkan alamat Gmail aktif untuk menerima pengingat jadwal.',
       )
       return
     }
@@ -67,20 +59,26 @@ export default function LoginScreen({ onLogin, onBack, dark, onToggleTheme }) {
       .join(' ')
 
     if (role === 'admin') {
-      if (ADMIN_EMAILS.length > 0 && !ADMIN_EMAILS.includes(trimmed.toLowerCase())) {
-        setError('Email tidak terdaftar sebagai Admin di VITE_ADMIN_EMAILS.')
+      if (ADMIN_EMAILS.length === 0) {
+        setError('VITE_ADMIN_EMAILS belum diatur pada file .env.')
         return
       }
-      if (ADMIN_PASSWORD && passTrimmed !== ADMIN_PASSWORD) {
-        setError('Kata sandi Admin tidak sesuai dengan VITE_ADMIN_PASSWORD.')
+      if (!ADMIN_EMAILS.includes(trimmed.toLowerCase())) {
+        setError('Email tidak terdaftar pada VITE_ADMIN_EMAILS.')
         return
       }
       onLogin({
         role: 'admin',
         email: trimmed,
-        name: displayName || 'Admin',
+        name: displayName || 'Admin Akademik',
         faculty: 'Admin',
       })
+      return
+    }
+
+    const passTrimmed = password.trim()
+    if (!passTrimmed) {
+      setError('Masukkan kata sandi Firebase terlebih dahulu.')
       return
     }
 
@@ -167,14 +165,14 @@ export default function LoginScreen({ onLogin, onBack, dark, onToggleTheme }) {
                 )}
               >
                 <ShieldCheck className="size-3.5" />
-                Admin
+                Admin Akademik
               </button>
             </div>
           </div>
 
           <div>
             <label htmlFor="gmail-input" className="mb-1.5 block text-xs font-medium text-zinc-600 dark:text-slate-400">
-              Alamat Gmail Aktif (Tujuan Pengingat)
+              {role === 'admin' ? 'Email Akun Admin Lokal' : 'Alamat Gmail Aktif (Tujuan Pengingat)'}
             </label>
             <div className="relative">
               <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
@@ -188,50 +186,56 @@ export default function LoginScreen({ onLogin, onBack, dark, onToggleTheme }) {
                   setEmail(e.target.value)
                   setError('')
                 }}
-                placeholder="nama.kamu@gmail.com"
+                placeholder={role === 'admin' ? 'admin@kampus.ac.id' : 'nama.kamu@gmail.com'}
                 className="h-10 w-full rounded-lg border border-line bg-white pl-9 pr-3 text-sm placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:focus:border-slate-500"
               />
             </div>
           </div>
 
-          <div>
-            <label htmlFor="firebase-token-input" className="mb-1.5 block text-xs font-medium text-zinc-600 dark:text-slate-400">
-              {role === 'admin' ? 'Kata Sandi Admin' : 'Token / Kata Sandi Firebase'}
-            </label>
-            <div className="relative">
-              <KeyRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
-              <input
-                id="firebase-token-input"
-                name="smartcal-firebase-token"
-                type="password"
-                autoComplete="off"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value)
-                  setError('')
-                }}
-                placeholder={role === 'admin' ? 'Masukkan kata sandi Admin' : 'Masukkan token / kata sandi Firebase'}
-                className="h-10 w-full rounded-lg border border-line bg-white pl-9 pr-3 text-sm placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:focus:border-slate-500"
-              />
-            </div>
-          </div>
+          {role === 'admin' ? (
+            <p className="rounded-lg border border-amber-200/80 bg-amber-50/80 px-3.5 py-2.5 text-xs leading-relaxed text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+              Admin masuk lokal di browser ini; email harus ada pada VITE_ADMIN_EMAILS.
+            </p>
+          ) : (
+            <>
+              <div>
+                <label htmlFor="firebase-token-input" className="mb-1.5 block text-xs font-medium text-zinc-600 dark:text-slate-400">
+                  Kata Sandi Firebase
+                </label>
+                <div className="relative">
+                  <KeyRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+                  <input
+                    id="firebase-token-input"
+                    name="smartcal-firebase-token"
+                    type="password"
+                    autoComplete="off"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value)
+                      setError('')
+                    }}
+                    placeholder="Masukkan kata sandi Firebase"
+                    className="h-10 w-full rounded-lg border border-line bg-white pl-9 pr-3 text-sm placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:focus:border-slate-500"
+                  />
+                </div>
+              </div>
 
-          {role === 'mahasiswa' && (
-            <div>
-              <label htmlFor="faculty-select" className="mb-1.5 block text-xs font-medium text-zinc-600 dark:text-slate-400">
-                Fakultas (Filter Jadwal Otomatis)
-              </label>
-              <select
-                id="faculty-select"
-                value={faculty}
-                onChange={(e) => setFaculty(e.target.value)}
-                className="h-10 w-full rounded-lg border border-line bg-white px-3 text-sm focus:border-zinc-900 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:focus:border-slate-500"
-              >
-                <option value="Fakultas Ilmu Komputer (FILKOM)">Fakultas Ilmu Komputer (FILKOM)</option>
-                <option value="Fakultas Ekonomi">Fakultas Ekonomi</option>
-                <option value="Fakultas Keperawatan">Fakultas Keperawatan</option>
-              </select>
-            </div>
+              <div>
+                <label htmlFor="faculty-select" className="mb-1.5 block text-xs font-medium text-zinc-600 dark:text-slate-400">
+                  Fakultas (Filter Jadwal Otomatis)
+                </label>
+                <select
+                  id="faculty-select"
+                  value={faculty}
+                  onChange={(e) => setFaculty(e.target.value)}
+                  className="h-10 w-full rounded-lg border border-line bg-white px-3 text-sm focus:border-zinc-900 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:focus:border-slate-500"
+                >
+                  <option value="Fakultas Ilmu Komputer (FILKOM)">Fakultas Ilmu Komputer (FILKOM)</option>
+                  <option value="Fakultas Ekonomi">Fakultas Ekonomi</option>
+                  <option value="Fakultas Keperawatan">Fakultas Keperawatan</option>
+                </select>
+              </div>
+            </>
           )}
 
           {error && (

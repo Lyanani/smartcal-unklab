@@ -9,6 +9,7 @@
     "lint": "node --check index.js"
   },
   "dependencies": {
+    "@google-cloud/firestore": "^9.4.1",
     "firebase-admin": "^14.5.1",
     "firebase-functions": "^7.4.0"
   }
