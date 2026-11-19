@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { signInWithEmailAndPassword } from 'firebase/auth'
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth'
 import {
   ArrowRight,
   CalendarRange,
@@ -19,11 +19,23 @@ const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAILS || '')
   .filter(Boolean)
 
 const mapFirebaseAuthError = (code) => {
+  if (code === 'auth/email-already-in-use') {
+    return 'Email ini sudah terdaftar. Silakan pilih mode Masuk untuk login.'
+  }
+  if (code === 'auth/weak-password') {
+    return 'Kata sandi terlalu lemah. Gunakan minimal 6 karakter.'
+  }
+  if (code === 'auth/invalid-email') {
+    return 'Format alamat email tidak valid.'
+  }
+  if (code === 'auth/operation-not-allowed') {
+    return 'Metode Email/Password belum diaktifkan di Firebase Console.'
+  }
   if (code === 'auth/invalid-credential' || code === 'auth/user-not-found' || code === 'auth/wrong-password') {
-    return 'Email atau kata sandi Firebase tidak cocok dengan akun yang terdaftar.'
+    return 'Email atau kata sandi tidak cocok. Jika belum punya akun, klik Daftar Akun Baru.'
   }
   if (code === 'auth/too-many-requests') {
-    return 'Terlalu banyak percobaan login. Tunggu sebentar lalu coba lagi.'
+    return 'Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.'
   }
   if (code === 'auth/network-request-failed') {
     return 'Gagal terhubung ke server Firebase. Periksa koneksi internet kamu.'
@@ -33,6 +45,7 @@ const mapFirebaseAuthError = (code) => {
 
 export default function LoginScreen({ onLogin, onBack, dark, onToggleTheme }) {
   const [role, setRole] = useState('mahasiswa')
+  const [authMode, setAuthMode] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [faculty, setFaculty] = useState('Fakultas Ilmu Komputer (FILKOM)')
@@ -82,11 +95,19 @@ export default function LoginScreen({ onLogin, onBack, dark, onToggleTheme }) {
       return
     }
 
+    if (authMode === 'register' && passTrimmed.length < 6) {
+      setError('Kata sandi baru minimal 6 karakter.')
+      return
+    }
+
     setSubmitting(true)
     setError('')
 
     try {
-      const credential = await signInWithEmailAndPassword(aiAuth, trimmed, passTrimmed)
+      const credential =
+        authMode === 'register'
+          ? await createUserWithEmailAndPassword(aiAuth, trimmed, passTrimmed)
+          : await signInWithEmailAndPassword(aiAuth, trimmed, passTrimmed)
       const verifiedEmail = credential.user?.email || trimmed
 
       onLogin({
@@ -170,6 +191,41 @@ export default function LoginScreen({ onLogin, onBack, dark, onToggleTheme }) {
             </div>
           </div>
 
+          {role === 'mahasiswa' && (
+            <div className="grid grid-cols-2 gap-2 rounded-lg border border-line bg-canvas p-1 dark:border-slate-800 dark:bg-slate-950">
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode('login')
+                  setError('')
+                }}
+                className={cn(
+                  'cursor-pointer touch-manipulation rounded-md py-1.5 text-xs font-medium transition',
+                  authMode === 'login'
+                    ? 'bg-white text-zinc-900 shadow-2xs dark:bg-slate-800 dark:text-white'
+                    : 'text-zinc-500 hover:text-zinc-800 dark:text-slate-400',
+                )}
+              >
+                Masuk
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode('register')
+                  setError('')
+                }}
+                className={cn(
+                  'cursor-pointer touch-manipulation rounded-md py-1.5 text-xs font-medium transition',
+                  authMode === 'register'
+                    ? 'bg-white text-zinc-900 shadow-2xs dark:bg-slate-800 dark:text-white'
+                    : 'text-zinc-500 hover:text-zinc-800 dark:text-slate-400',
+                )}
+              >
+                Daftar Akun Baru
+              </button>
+            </div>
+          )}
+
           <div>
             <label htmlFor="gmail-input" className="mb-1.5 block text-xs font-medium text-zinc-600 dark:text-slate-400">
               {role === 'admin' ? 'Email Akun Admin Lokal' : 'Alamat Gmail Aktif (Tujuan Pengingat)'}
@@ -200,7 +256,7 @@ export default function LoginScreen({ onLogin, onBack, dark, onToggleTheme }) {
             <>
               <div>
                 <label htmlFor="firebase-token-input" className="mb-1.5 block text-xs font-medium text-zinc-600 dark:text-slate-400">
-                  Kata Sandi Firebase
+                  {authMode === 'register' ? 'Buat Kata Sandi Baru (Min. 6 Karakter)' : 'Kata Sandi Firebase'}
                 </label>
                 <div className="relative">
                   <KeyRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
@@ -214,7 +270,7 @@ export default function LoginScreen({ onLogin, onBack, dark, onToggleTheme }) {
                       setPassword(e.target.value)
                       setError('')
                     }}
-                    placeholder="Masukkan kata sandi Firebase"
+                    placeholder={authMode === 'register' ? 'Minimal 6 karakter' : 'Masukkan kata sandi Firebase'}
                     className="h-10 w-full rounded-lg border border-line bg-white pl-9 pr-3 text-sm placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:focus:border-slate-500"
                   />
                 </div>
@@ -249,7 +305,13 @@ export default function LoginScreen({ onLogin, onBack, dark, onToggleTheme }) {
             disabled={submitting}
             className="mt-1 inline-flex h-11 cursor-pointer touch-manipulation items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
           >
-            {submitting ? 'Memverifikasi Firebase...' : 'Masuk ke Portal Akademik'}
+            {submitting
+              ? authMode === 'register'
+                ? 'Mendaftarkan Akun...'
+                : 'Memverifikasi Firebase...'
+              : role === 'mahasiswa' && authMode === 'register'
+                ? 'Daftar & Masuk ke Portal'
+                : 'Masuk ke Portal Akademik'}
             <ArrowRight className="size-4" />
           </button>
         </form>
