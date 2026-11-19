@@ -208,7 +208,7 @@ export default function ScheduleAssistant({ user, events, onAddPersonalEvent }) 
                 {conflicts.length > 0 && (
                   <p className="mt-2 flex items-start gap-1.5 text-xs text-rose-700 dark:text-rose-300">
                     <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-                    Bentrok dengan {conflicts.map((event) => `â€œ${event.title}â€`).join(', ')}.
+                    Bentrok dengan {conflicts.map((event) => `"${event.title}"`).join(', ')}.
                   </p>
                 )}
               </div>
